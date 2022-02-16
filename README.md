@@ -27,7 +27,7 @@ near call $ID new_task '{"title": "Retweet LNC post", "description": "Please Ret
 ```
 ### register_as_a_worker
 ```sh
-near call $ID register '{requester: false}' --accountId job_worker.testnet --amount 0.5
+near call $ID register '{"requester": false}' --accountId job_worker.testnet --amount 0.5
 ```
 
 ### submit_proposal

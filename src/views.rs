@@ -37,6 +37,31 @@ impl Dupwork {
                     WrappedTask::from(self.tasks_recores.get(&k).unwrap()),
                 )
             })
+            .filter(|(_k, v)| v.status != JobStatus::ReadyForApply)
+            .map(|(k, task)| (k, WrappedTask::from(task)))
+            .collect()
+    }
+
+    pub fn completed_tasks(
+        &self,
+        account_id: ValidAccountId,
+        from_index: u64,
+        limit: u64,
+    ) -> Vec<(TaskId, WrappedTask)> {
+        let tasks_id = self
+            .users
+            .get(&account_id)
+            .expect("User not found")
+            .completed_jobs;
+
+        tasks_id
+            .iter()
+            .map(|k| {
+                (
+                    k.clone(),
+                    WrappedTask::from(self.tasks_recores.get(&k).unwrap()),
+                )
+            })
             .collect()
     }
 

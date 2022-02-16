@@ -7,8 +7,7 @@ pub struct WrappedTask {
     pub title: String,
     pub description: String,
     pub max_participants: u16,
-    pub hour_rate: WrappedBalance,
-    pub hour_estimation: Duration,
+    pub price: WrappedBalance,
     pub proposals: Vec<WrappedProposal>,
     pub status: JobStatus,
 }
@@ -26,8 +25,7 @@ impl From<Task> for WrappedTask {
             title: task.title,
             description: task.description,
             max_participants: task.max_participants,
-            hour_rate: WrappedBalance::from(task.hour_rate),
-            hour_estimation: task.hour_estimation,
+            price: WrappedBalance::from(task.price),
             proposals: wrapped_proposal,
             status: task.status,
         }
@@ -82,8 +80,7 @@ impl From<UserType> for WrappedUserType {
 pub struct WrappedProposal {
     pub account_id: ValidAccountId,
     pub cover_letter: String,
-    pub hour_estimation: Duration,
-    pub total_received: WrappedBalance,
+    pub price: WrappedBalance,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
 }
 
@@ -92,8 +89,7 @@ impl From<Proposal> for WrappedProposal {
         WrappedProposal {
             account_id: proposal.account_id,
             cover_letter: proposal.cover_letter,
-            hour_estimation: proposal.hour_estimation,
-            total_received: WrappedBalance::from(proposal.total_received),
+            price: WrappedBalance::from(proposal.price),
             proof_of_work: proposal.proof_of_work,
         }
     }

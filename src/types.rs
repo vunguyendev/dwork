@@ -24,6 +24,7 @@ pub enum JobStatus {
     FoundWorker,
     WorkSubmitted,
     Payout,
+    Pending,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -32,8 +33,7 @@ pub struct Task {
     pub title: String,
     pub description: String,
     pub max_participants: u16,
-    pub hour_rate: Balance,
-    pub hour_estimation: Duration,
+    pub price: Balance,
     pub proposals: Vector<Proposal>,
     pub status: JobStatus,
 }
@@ -51,7 +51,6 @@ pub struct User {
 pub struct Proposal {
     pub account_id: ValidAccountId,
     pub cover_letter: String,
-    pub hour_estimation: Duration,
-    pub total_received: Balance,
+    pub price: Balance,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
 }
