@@ -9,7 +9,7 @@ pub struct WrappedTask {
     pub max_participants: u16,
     pub price: WrappedBalance,
     pub proposals: Vec<WrappedProposal>,
-    pub status: JobStatus,
+    pub available_until: WrappedTimestamp,
 }
 
 impl From<Task> for WrappedTask {
@@ -17,7 +17,7 @@ impl From<Task> for WrappedTask {
         let wrapped_proposal: Vec<WrappedProposal> = task
             .proposals
             .iter()
-            .map(|item| WrappedProposal::from(item))
+            .map(|(_k, item)| WrappedProposal::from(item))
             .collect();
 
         WrappedTask {
@@ -27,7 +27,8 @@ impl From<Task> for WrappedTask {
             max_participants: task.max_participants,
             price: WrappedBalance::from(task.price),
             proposals: wrapped_proposal,
-            status: task.status,
+            available_until: WrappedTimestamp::from(task.available_until)
+
         }
     }
 }
@@ -79,18 +80,16 @@ impl From<UserType> for WrappedUserType {
 #[serde(crate = "near_sdk::serde")]
 pub struct WrappedProposal {
     pub account_id: ValidAccountId,
-    pub cover_letter: String,
-    pub price: WrappedBalance,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
+    pub is_approved: bool
 }
 
 impl From<Proposal> for WrappedProposal {
     fn from(proposal: Proposal) -> Self {
         WrappedProposal {
             account_id: proposal.account_id,
-            cover_letter: proposal.cover_letter,
-            price: WrappedBalance::from(proposal.price),
             proof_of_work: proposal.proof_of_work,
+            is_approved: proposal.is_approved
         }
     }
 }

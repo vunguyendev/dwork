@@ -16,26 +16,15 @@ pub enum UserType {
     },
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
-#[serde(crate = "near_sdk::serde")]
-#[serde(tag = "type")]
-pub enum JobStatus {
-    ReadyForApply,
-    FoundWorker,
-    WorkSubmitted,
-    Payout,
-    Pending,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct Task {
     pub owner: ValidAccountId,
     pub title: String,
     pub description: String,
     pub max_participants: u16,
     pub price: Balance,
-    pub proposals: Vector<Proposal>,
-    pub status: JobStatus,
+    pub proposals: UnorderedMap<ValidAccountId, Proposal>,
+    pub available_until: Timestamp,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -50,7 +39,6 @@ pub struct User {
 #[serde(crate = "near_sdk::serde")]
 pub struct Proposal {
     pub account_id: ValidAccountId,
-    pub cover_letter: String,
-    pub price: Balance,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
+    pub is_approved: bool,
 }

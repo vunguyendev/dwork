@@ -12,7 +12,7 @@ impl Dupwork {
                 let task = self.tasks_recores.get(&task_id.clone()).unwrap();
                 (task_id.clone(), task)
             })
-            .filter(|(_k, v)| v.status == JobStatus::ReadyForApply)
+            .filter(|(_k, v)| v.max_participants as u64 > v.proposals.len())
             .map(|(k, task)| (k, WrappedTask::from(task)))
             .collect()
     }
@@ -37,7 +37,7 @@ impl Dupwork {
                     WrappedTask::from(self.tasks_recores.get(&k).unwrap()),
                 )
             })
-            .filter(|(_k, v)| v.status != JobStatus::ReadyForApply)
+            .filter(|(_k, v)| v.proposals.len() > 0)
             .map(|(k, task)| (k, WrappedTask::from(task)))
             .collect()
     }
@@ -76,14 +76,6 @@ impl Dupwork {
                 })
             })
             .expect("Canot map user to json")
-    }
-
-    pub fn view_proposals(&self, task_id: String) -> Vec<Proposal> {
-        self.tasks_recores
-            .get(&task_id)
-            .expect("Not found this job in dupwork system")
-            .proposals
-            .to_vec()
     }
 
     pub fn task_by_id(&self, task_id: TaskId) -> WrappedTask {
