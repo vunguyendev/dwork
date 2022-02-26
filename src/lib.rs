@@ -1,9 +1,10 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet, Vector};
-use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedTimestamp, WrappedDuration};
+use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    env, ext_contract, near_bindgen, setup_alloc, Balance, Duration, Gas, Promise, PromiseResult, Timestamp
+    env, ext_contract, near_bindgen, setup_alloc, Balance, Duration, Gas, Promise, PromiseResult,
+    Timestamp,
 };
 use std::convert::TryFrom;
 
@@ -128,8 +129,9 @@ impl Dupwork {
         description: String,
         price: WrappedBalance,
         max_participants: u16,
-        duration: WrappedDuration
+        duration: WrappedDuration,
     ) {
+        //TODO: Maximum deposit
         let owner = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
         let mut user = self
             .users
@@ -142,13 +144,17 @@ impl Dupwork {
             .expect("Cannot calculate total amount");
 
         assert!(
+            env::attached_deposit() >= MINIMUM_PRICE_PER_TASK && env::attached_deposit() <= MAXIMUM_PRICE_PER_TASK,
+            "Total amount for each task must be in a range from {} to {}", MINIMUM_PRICE_PER_TASK, MAXIMUM_PRICE_PER_TASK
+        );
+
+        assert!(
             env::attached_deposit() == amount_need_to_pay,
             "Attach exactly {} yoctoNear",
             amount_need_to_pay
         );
 
-        match user.user_type 
-{
+        match user.user_type {
             UserType::Worker { .. } => panic!("Only requester can create a task"),
             UserType::Requester {
                 total_transfered,
@@ -187,7 +193,7 @@ impl Dupwork {
                     /// When SO try to apply, their offer has to be less than 20% different from owner estimation.
                     max_participants,
                     proposals: UnorderedMap::new(proposal_prefix),
-                    available_until: env::block_timestamp() + unwrap_duration
+                    available_until: env::block_timestamp() + unwrap_duration,
                 };
 
                 env::log(format!("New task: {:?}", task_id).as_bytes());
@@ -215,7 +221,7 @@ impl Dupwork {
         let amount_to_transfer = task.price.into();
         // Make a transfer to the worker
         Promise::new(beneficiary_id.to_string())
-            .transfer(amount_to_transfer)
+            .transfer(amount_to_transfer + SUBMIT_BOND)
             .then(ext_self::on_transferd(
                 task_id,
                 beneficiary_id,
@@ -230,22 +236,27 @@ impl Dupwork {
         let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
 
         let beneficiary_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-        assert!(task.owner == beneficiary_id, "Only owner can reject proposal");
+        assert!(
+            task.owner == beneficiary_id,
+            "Only owner can reject proposal"
+        );
 
         task.proposals.remove(&worker_id);
         self.tasks_recores.insert(&task_id, &task);
 
-        let amount_to_transfer = task.price.into();
+        let amount_to_transfer: Balance = task.price.into();
 
-        Promise::new(beneficiary_id.to_string())
-            .transfer(amount_to_transfer);
+        Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
     }
 
-    pub fn mark_task_as_complete(&mut self, task_id: TaskId) {
+    pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
         let task = self.tasks_recores.get(&task_id).expect("Job not exist");
 
         let beneficiary_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-        assert!(task.owner == beneficiary_id, "Only owner can reject proposal");
+        assert!(
+            task.owner == beneficiary_id,
+            "Only owner can reject proposal"
+        );
 
         assert!(
             task.available_until < env::block_timestamp(),
@@ -253,15 +264,20 @@ impl Dupwork {
         );
 
         assert!(
-            task.proposals.iter().filter(|(_k, v)| v.is_approved == false).count() > 0,
+            task.proposals
+                .iter()
+                .filter(|(_k, v)| v.is_approved == false)
+                .count()
+                > 0,
             "Some work remains unchecked"
         );
-
 
         if task.proposals.len() < task.max_participants as u64 {
             let refund: u64 = (task.max_participants as u64) - task.proposals.len();
 
-            let amount_to_transfer = (task.price as u128).checked_mul(refund.into()).expect("Can not calculate amount to refund");
+            let amount_to_transfer = (task.price as u128)
+                .checked_mul(refund.into())
+                .expect("Can not calculate amount to refund");
 
             Promise::new(beneficiary_id.to_string())
                 .transfer(amount_to_transfer)
@@ -271,12 +287,19 @@ impl Dupwork {
                     amount_to_transfer,
                     &env::current_account_id(),
                     0,
-                    DEFAULT_GAS_TO_PAY
+                    DEFAULT_GAS_TO_PAY,
                 ));
         }
     }
 
+    #[payable]
     pub fn submit_work(&mut self, task_id: String, proof: String) {
+        assert!(
+            env::attached_deposit() == SUBMIT_BOND,
+            "Send exactly {:?} Near to register",
+            SUBMIT_BOND
+        );
+
         let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
 
         assert!(
@@ -284,12 +307,30 @@ impl Dupwork {
             "This request is expire!"
         );
 
+        //TODO increase worker current task
+
         let worker_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+
+        let mut worker = self.users.get(&worker_id).expect("User not found");
+
+        if let UserType::Worker {
+            total_received,
+            current_applies,
+        } = worker.user_type
+        {
+            worker.user_type = UserType::Worker {
+                total_received,
+                current_applies: current_applies + 1,
+            };
+
+            worker.current_jobs.insert(&task_id);
+            self.users.insert(&worker_id, &worker);
+        }
 
         let proposal = Proposal {
             account_id: worker_id.clone(),
             proof_of_work: proof,
-            is_approved: false
+            is_approved: false,
         };
 
         task.proposals.insert(&worker_id, &proposal);
@@ -301,7 +342,7 @@ impl Dupwork {
         &mut self,
         task_id: TaskId,
         owner_id: ValidAccountId,
-        amount_to_transfer: Balance
+        amount_to_transfer: Balance,
     ) -> bool {
         assert!(
             env::predecessor_account_id() == env::current_account_id(),
@@ -334,7 +375,7 @@ impl Dupwork {
 
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 
@@ -356,14 +397,18 @@ impl Dupwork {
 
         match env::promise_result(0) {
             PromiseResult::Successful(_) => {
-                let task = self.tasks_recores.get(&task_id).expect("Job not exist");
-                task.proposals.get(&beneficiary_id).expect("Proposal not found!").is_approved = true;
+                let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
+                let mut proposal = task.proposals
+                    .get(&beneficiary_id)
+                    .expect("Proposal not found!");
+
+                proposal.is_approved = true;
+                task.proposals.insert(&beneficiary_id, &proposal);
                 self.tasks_recores.insert(&task_id, &task);
 
                 let mut worker = self.users.get(&beneficiary_id).expect("Not found worker");
                 worker.completed_jobs.insert(&task_id);
                 worker.current_jobs.remove(&task_id);
-
 
                 if let UserType::Worker {
                     total_received,

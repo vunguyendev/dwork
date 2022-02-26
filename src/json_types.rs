@@ -27,8 +27,7 @@ impl From<Task> for WrappedTask {
             max_participants: task.max_participants,
             price: WrappedBalance::from(task.price),
             proposals: wrapped_proposal,
-            available_until: WrappedTimestamp::from(task.available_until)
-
+            available_until: WrappedTimestamp::from(task.available_until),
         }
     }
 }
@@ -81,7 +80,7 @@ impl From<UserType> for WrappedUserType {
 pub struct WrappedProposal {
     pub account_id: ValidAccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
-    pub is_approved: bool
+    pub is_approved: bool,
 }
 
 impl From<Proposal> for WrappedProposal {
@@ -89,7 +88,7 @@ impl From<Proposal> for WrappedProposal {
         WrappedProposal {
             account_id: proposal.account_id,
             proof_of_work: proposal.proof_of_work,
-            is_approved: proposal.is_approved
+            is_approved: proposal.is_approved,
         }
     }
 }

@@ -22,39 +22,36 @@ near call $ID new '{}' --accountId $ID
 ```sh
 //Register as a requester
 near call $ID register '{"requester": true}' --accountId job_creator.testnet --amount 0.5
+
 // Create new job: job_creator.testnet
-near call $ID new_task '{"title": "Retweet LNC post", "description": "Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers", "hour_rate": 10000000000, "hour_estimation": 86400, "max_participants": 2}' --accountId job_creator.testnet
+near call $ID new_task '{"title": "Retweet LNC post", "description": "Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers", "price": "1000000000000000000", "max_participants": 2, "duration": "99999999999999999"}' --accountId job_creator.testnet --depositYocto 2000000000000000000
 ```
 ### register_as_a_worker
 ```sh
 near call $ID register '{"requester": false}' --accountId job_worker.testnet --amount 0.5
 ```
 
-### submit_proposal
-```sh
-near call $ID submit_proposal '{"task_id": "job_creator.testnet_81919914", "cover_letter": "I am hungry", "hour_estimation": 3600000000000}' --accountId job_worker.testnet
-```
-
-### view_proposals 
-```sh 
-near view $ID view_proposals '{"task_id": "job_creator.testnet_81920544"}'
-```
-
-### select_proposal
-```sh
-near call $id select_proposal '{"task_id": "job_creator.testnet_81919914", "index": 0}' --accountid job_creator.testnet --amount 1
-```
-
 ### submit_work
+//attach 0.1 for each submission
+//when task close we will refund 
 ```sh
-near call $ID submit_work '{"task_id": "job_creator.testnet_80190186", "url": "https://github.com/vunguyendev/dupwork"}' --accountId job_worker.testnet 
+near call $ID submit_work '{"task_id": "'$TASK_ID'", "proof": "https://github.com/vunguyendev/dupwork"}' --accountId job_worker.testnet 
 ```
 
-### validate_work
+### approve_work 
 ```sh
-near call $ID validate_work '{"task_id": "job_creator.testnet_80190186"}' --accountId job_creator.testnet
+near call $ID approve_work '{"task_id": "'$TASK_ID'", "worker_id": "job_worker.testnet"}' --accountId job_creator.testnet 
 ```
 
+### reject_work 
+```sh
+near call $ID reject_work '{"task_id": "'$TASK_ID'", "worker_id": "job_worker.testnet"}' --accountId job_creator.testnet
+```
+
+### mark_task_as_completed
+```sh
+near call $ID mark_task_as_completed '{"task_id": "'$TASK_ID'"}' --accountId job_creator.testnet
+```
 
 ## Views 
 ```sh 
@@ -62,29 +59,62 @@ near call $ID validate_work '{"task_id": "job_creator.testnet_80190186"}' --acco
 near view $ID available_tasks '{"from_index": 0, "limit": 10}'
 
 Response example
+View call: dev-1645542863744-61299495451094.available_tasks({"from_index": 0, "limit": 10})
 [
-  {
-    task_id: 'job_creator.testnet_81919914',
-    owner: 'job_creator.testnet',
-    title: 'Retweet LNC post',
-    description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
-    max_participants: 2,
-    hour_rate: '1000000000',
-    hour_estimation: 86400000000,
-    proposals: [],
-    status: { type: 'ReadyForApply' }
-  },
-  {
-    task_id: 'job_creator.testnet_81920544',
-    owner: 'job_creator.testnet',
-    title: 'Retweet LNC post',
-    description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
-    max_participants: 2,
-    hour_rate: '1000000000',
-    hour_estimation: 86400000000,
-    proposals: [],
-    status: { type: 'ReadyForApply' }
-  }
+  [
+    'job_creator.testnet_83453377',
+    {
+      owner: 'job_creator.testnet',
+      title: 'Retweet LNC post',
+      description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
+      max_participants: 2,
+      price: '1000000000000000000',
+      proposals: [],
+      available_until: '1645543006936448101'
+    }
+  ],
+  [
+    'job_creator.testnet_83453523',
+    {
+      owner: 'job_creator.testnet',
+      title: 'Retweet LNC post',
+      description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
+      max_participants: 2,
+      price: '1000000000000000000',
+      proposals: [],
+      available_until: '1645543168411808341'
+    }
+  ],
+  [
+    'job_creator.testnet_83453651',
+    {
+      owner: 'job_creator.testnet',
+      title: 'Retweet LNC post',
+      description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
+      max_participants: 2,
+      price: '1000000000000000000',
+      proposals: [
+        {
+          account_id: 'job_worker.testnet',
+          proof_of_work: 'https://github.com/vunguyendev/dupwork',
+          is_approved: false
+        }
+      ],
+      available_until: '1745543317976864393'
+    }
+  ],
+  [
+    'job_creator.testnet_83454176',
+    {
+      owner: 'job_creator.testnet',
+      title: 'Retweet LNC post',
+      description: 'Please Retweet this https://twitter.com/LearnNear/status/1491130118055796737. Your account need at least 5000 real followers',
+      max_participants: 2,
+      price: '1000000000000000000',
+      proposals: [],
+      available_until: '1745543874924929128'
+    }
+  ]
 ]
 
 //get user info
@@ -97,5 +127,3 @@ Response example
   completed_jobs: []
 }
 ```
-
-
