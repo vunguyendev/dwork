@@ -12,7 +12,10 @@ impl Dupwork {
                 let task = self.tasks_recores.get(&task_id.clone()).unwrap();
                 (task_id.clone(), task)
             })
-            .filter(|(_k, v)| v.max_participants as u64 > v.proposals.len())
+            .filter(|(_k, v)| {
+                (v.max_participants as u64 > v.proposals.len()
+                    && v.available_until > env::block_timestamp())
+            })
             .map(|(k, task)| (k, WrappedTask::from(task)))
             .collect()
     }

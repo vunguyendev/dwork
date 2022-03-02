@@ -144,14 +144,17 @@ impl Dupwork {
             .expect("Cannot calculate total amount");
 
         assert!(
-            env::attached_deposit() >= MINIMUM_PRICE_PER_TASK && env::attached_deposit() <= MAXIMUM_PRICE_PER_TASK,
-            "Total amount for each task must be in a range from {} to {}", MINIMUM_PRICE_PER_TASK, MAXIMUM_PRICE_PER_TASK
-        );
-
-        assert!(
             env::attached_deposit() == amount_need_to_pay,
             "Attach exactly {} yoctoNear",
             amount_need_to_pay
+        );
+
+        assert!(
+            env::attached_deposit() >= MINIMUM_PRICE_PER_TASK
+                && env::attached_deposit() <= MAXIMUM_PRICE_PER_TASK,
+            "Total amount for each task must be in a range from {} to {}",
+            MINIMUM_PRICE_PER_TASK,
+            MAXIMUM_PRICE_PER_TASK
         );
 
         match user.user_type {
@@ -244,9 +247,9 @@ impl Dupwork {
         task.proposals.remove(&worker_id);
         self.tasks_recores.insert(&task_id, &task);
 
-        let amount_to_transfer: Balance = task.price.into();
+        // let amount_to_transfer: Balance = task.price.into();
 
-        Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
+        // Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
     }
 
     pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
@@ -268,7 +271,7 @@ impl Dupwork {
                 .iter()
                 .filter(|(_k, v)| v.is_approved == false)
                 .count()
-                > 0,
+                == 0,
             "Some work remains unchecked"
         );
 
@@ -289,6 +292,8 @@ impl Dupwork {
                     0,
                     DEFAULT_GAS_TO_PAY,
                 ));
+        } else {
+            panic!("Some err need to check!");
         }
     }
 
@@ -305,6 +310,11 @@ impl Dupwork {
         assert!(
             task.available_until > env::block_timestamp(),
             "This request is expire!"
+        );
+
+        assert!(
+            task.proposals.to_vec().len() < task.max_participants as usize,
+            "Full participants"
         );
 
         //TODO increase worker current task
@@ -365,6 +375,7 @@ impl Dupwork {
                     current_requests,
                 } = owner.user_type
                 {
+                    assert!(current_requests > 0, "Current requests is zero!");
                     owner.user_type = UserType::Requester {
                         total_transfered: total_transfered + amount_to_transfer,
                         current_requests: current_requests - 1,
@@ -398,7 +409,8 @@ impl Dupwork {
         match env::promise_result(0) {
             PromiseResult::Successful(_) => {
                 let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
-                let mut proposal = task.proposals
+                let mut proposal = task
+                    .proposals
                     .get(&beneficiary_id)
                     .expect("Proposal not found!");
 
@@ -410,11 +422,27 @@ impl Dupwork {
                 worker.completed_jobs.insert(&task_id);
                 worker.current_jobs.remove(&task_id);
 
+                if task
+                    .proposals
+                    .iter()
+                    .filter(|(_k, v)| v.is_approved == true)
+                    .count() as u16
+                    == task.max_participants
+                {
+                    let owner_id = task.owner;
+                    let mut owner = self.users.get(&owner_id).expect("Not found owner");
+                    owner.completed_jobs.insert(&task_id);
+                    owner.current_jobs.remove(&task_id);
+
+                    self.users.insert(&owner_id, &owner);
+                }
+
                 if let UserType::Worker {
                     total_received,
                     current_applies,
                 } = worker.user_type
                 {
+                    assert!(current_applies > 0, "Current apllies is zero!");
                     env::log(format!("Worker = {} {}", total_received, current_applies).as_bytes());
                     worker.user_type = UserType::Worker {
                         total_received: total_received + amount_to_transfer,
