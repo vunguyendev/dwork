@@ -6,17 +6,32 @@ impl Dupwork {
     pub fn available_tasks(&self, from_index: u64, limit: u64) -> Vec<(TaskId, WrappedTask)> {
         let tasks_id = self.tasks_recores.keys_as_vector();
 
-        (from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
+        let from = if tasks_id.len() > (limit + from_index) {
+            tasks_id.len() - limit - from_index
+        } else {
+            0
+        };
+
+        let to = if tasks_id.len() > from_index {
+            tasks_id.len() - from_index
+        } else {
+            0
+        };
+
+        (from..to)
+        // (std::cmp::max(from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
             .map(|index| {
                 let task_id = tasks_id.get(index as u64).unwrap();
                 let task = self.tasks_recores.get(&task_id.clone()).unwrap();
-                (task_id.clone(), task)
+                (task_id.clone(), WrappedTask::from(task))
             })
-            .filter(|(_k, v)| {
-                (v.max_participants as u64 > v.proposals.len()
-                    && v.available_until > env::block_timestamp())
-            })
-            .map(|(k, task)| (k, WrappedTask::from(task)))
+            // .filter(|(_k, v)| {
+            //     let available_until: u64 = v.available_until.into();
+            //     (v.max_participants as u64 > v.proposals.len() as u64
+            //         && available_until > env::block_timestamp())
+            // })
+            // .map(|(k, task)| (k, WrappedTask::from(task)))
+            .rev()
             .collect()
     }
 
