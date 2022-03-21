@@ -1,19 +1,23 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet, Vector};
+use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    env, ext_contract, near_bindgen, setup_alloc, Balance, Duration, Gas, Promise, PromiseResult,
-    Timestamp,
+    env, ext_contract, near_bindgen, setup_alloc, Balance, Duration, Gas, PanicOnDefault, Promise,
+    PromiseResult, Timestamp,
 };
 use std::convert::TryFrom;
 
+pub use crate::categories::*;
 pub use crate::constants::*;
+pub use crate::ext::*;
 pub use crate::json_types::*;
 pub use crate::types::*;
 pub use crate::views::*;
 
+mod categories;
 mod constants;
+mod ext;
 mod json_types;
 mod types;
 mod views;
@@ -21,37 +25,13 @@ mod views;
 setup_alloc!();
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Dupwork {
     tasks_recores: UnorderedMap<TaskId, Task>,
     users: LookupMap<ValidAccountId, User>,
+    categories: UnorderedMap<CategoryId, Category>,
 }
 
-#[ext_contract(ext_self)]
-pub trait ExtDupwork {
-    fn on_transferd(
-        &mut self,
-        task_id: String,
-        beneficiary_id: ValidAccountId,
-        amount_to_transfer: Balance,
-    ) -> bool;
-
-    fn on_refund(
-        &mut self,
-        task_id: TaskId,
-        owner_id: ValidAccountId,
-        amount_to_transfer: Balance,
-    ) -> bool;
-}
-
-impl Default for Dupwork {
-    fn default() -> Self {
-        Self {
-            tasks_recores: UnorderedMap::new(b"tasks_recores".to_vec()),
-            users: LookupMap::new(b"users".to_vec()),
-        }
-    }
-}
 #[near_bindgen]
 impl Dupwork {
     #[init]
@@ -61,6 +41,7 @@ impl Dupwork {
         Self {
             tasks_recores: UnorderedMap::new(b"tasks_recores".to_vec()),
             users: LookupMap::new(b"users".to_vec()),
+            categories: UnorderedMap::new(b"categories".to_vec()),
         }
     }
 
@@ -74,12 +55,10 @@ impl Dupwork {
 
         let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
         let mut current_jobs_prefix = Vec::with_capacity(33);
-        // Adding unique prefix.
         current_jobs_prefix.push(b'c');
         current_jobs_prefix.extend(env::sha256(env::predecessor_account_id().as_bytes()));
 
         let mut completed_jobs_prefix = Vec::with_capacity(33);
-        // Adding unique prefix.
         completed_jobs_prefix.push(b'd');
         completed_jobs_prefix.extend(env::sha256(env::predecessor_account_id().as_bytes()));
 
@@ -90,6 +69,7 @@ impl Dupwork {
                     total_transfered: 0,
                     current_requests: 0,
                 },
+                bio: "A member of dWork".to_string(),
                 completed_jobs: UnorderedSet::new(completed_jobs_prefix),
                 current_jobs: UnorderedSet::new(current_jobs_prefix),
             };
@@ -98,6 +78,7 @@ impl Dupwork {
         } else {
             let user = User {
                 account_id: account_id.clone(),
+                bio: "A member of dWork".to_string(),
                 user_type: UserType::Worker {
                     total_received: 0,
                     current_applies: 0,
@@ -130,6 +111,7 @@ impl Dupwork {
         price: WrappedBalance,
         max_participants: u16,
         duration: WrappedDuration,
+        category_id: CategoryId,
     ) {
         //TODO: Maximum deposit
         //
@@ -194,13 +176,19 @@ impl Dupwork {
                     title,
                     description,
                     price: price.into(),
-                    /// When SO try to apply, their offer has to be less than 20% different from owner estimation.
                     max_participants,
                     proposals: UnorderedMap::new(proposal_prefix),
                     available_until: env::block_timestamp() + unwrap_duration,
+                    category_id: category_id.clone(),
                 };
 
-                env::log(format!("New task: {:?}", task_id).as_bytes());
+                //Update num_posts in category
+                if let Some(mut category) = self.categories.get(&category_id) {
+                    category.num_posts += 1;
+                    self.categories.insert(&category_id, &category);
+                } else {
+                    panic!("Not found your category");
+                }
 
                 self.tasks_recores.insert(&task_id, &task);
                 //Update user current requests
@@ -245,11 +233,12 @@ impl Dupwork {
             "Only owner can reject proposal"
         );
 
-        task.proposals.remove(&worker_id);
+        let mut proposal = task.proposals.get(&worker_id).expect("Not found proposal");
+        proposal.is_rejected = true;
+        task.proposals.insert(&worker_id, &proposal);
         self.tasks_recores.insert(&task_id, &task);
 
         // let amount_to_transfer: Balance = task.price.into();
-
         // Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
     }
 
@@ -314,8 +303,12 @@ impl Dupwork {
         );
 
         assert!(
-            task.proposals.to_vec().len() < task.max_participants as usize,
-            "Full participants"
+            task.proposals
+                .iter()
+                .filter(|(_k, v)| v.is_approved)
+                .count()
+                < task.max_participants as usize,
+            "Full approved participants"
         );
 
         //TODO increase worker current task
@@ -342,119 +335,22 @@ impl Dupwork {
             account_id: worker_id.clone(),
             proof_of_work: proof,
             is_approved: false,
+            is_rejected: false,
         };
 
         task.proposals.insert(&worker_id, &proposal);
         self.tasks_recores.insert(&task_id, &task);
     }
 
-    // Ext
-    pub fn on_refund(
-        &mut self,
-        task_id: TaskId,
-        owner_id: ValidAccountId,
-        amount_to_transfer: Balance,
-    ) -> bool {
-        assert!(
-            env::predecessor_account_id() == env::current_account_id(),
-            "Callback is not called from the contract itself",
-        );
+    //Account logic
+    pub fn update_bio(&mut self, bio: String) {
+        let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let mut user = self
+            .users
+            .get(&account_id)
+            .expect("You are not a member of dupwork");
 
-        assert!(
-            env::promise_results_count() == 1,
-            "Function called not as a callback",
-        );
-
-        match env::promise_result(0) {
-            PromiseResult::Successful(_) => {
-                let mut owner = self.users.get(&owner_id).expect("Not found owner");
-                owner.completed_jobs.insert(&task_id);
-                owner.current_jobs.remove(&task_id);
-
-                if let UserType::Requester {
-                    total_transfered,
-                    current_requests,
-                } = owner.user_type
-                {
-                    assert!(current_requests > 0, "Current requests is zero!");
-                    owner.user_type = UserType::Requester {
-                        total_transfered: total_transfered + amount_to_transfer,
-                        current_requests: current_requests - 1,
-                    };
-
-                    self.users.insert(&owner_id, &owner);
-                }
-
-                true
-            }
-            _ => false,
-        }
-    }
-
-    pub fn on_transferd(
-        &mut self,
-        task_id: String,
-        beneficiary_id: ValidAccountId,
-        amount_to_transfer: Balance,
-    ) -> bool {
-        assert!(
-            env::predecessor_account_id() == env::current_account_id(),
-            "Callback is not called from the contract itself",
-        );
-
-        assert!(
-            env::promise_results_count() == 1,
-            "Function called not as a callback",
-        );
-
-        match env::promise_result(0) {
-            PromiseResult::Successful(_) => {
-                let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
-                let mut proposal = task
-                    .proposals
-                    .get(&beneficiary_id)
-                    .expect("Proposal not found!");
-
-                proposal.is_approved = true;
-                task.proposals.insert(&beneficiary_id, &proposal);
-                self.tasks_recores.insert(&task_id, &task);
-
-                let mut worker = self.users.get(&beneficiary_id).expect("Not found worker");
-                worker.completed_jobs.insert(&task_id);
-                worker.current_jobs.remove(&task_id);
-
-                if task
-                    .proposals
-                    .iter()
-                    .filter(|(_k, v)| v.is_approved == true)
-                    .count() as u16
-                    == task.max_participants
-                {
-                    let owner_id = task.owner;
-                    let mut owner = self.users.get(&owner_id).expect("Not found owner");
-                    owner.completed_jobs.insert(&task_id);
-                    owner.current_jobs.remove(&task_id);
-
-                    self.users.insert(&owner_id, &owner);
-                }
-
-                if let UserType::Worker {
-                    total_received,
-                    current_applies,
-                } = worker.user_type
-                {
-                    assert!(current_applies > 0, "Current apllies is zero!");
-                    env::log(format!("Worker = {} {}", total_received, current_applies).as_bytes());
-                    worker.user_type = UserType::Worker {
-                        total_received: total_received + amount_to_transfer,
-                        current_applies: current_applies - 1,
-                    };
-
-                    self.users.insert(&beneficiary_id, &worker);
-                }
-                true
-            }
-            _ => false,
-        }
+        user.bio = bio;
+        self.users.insert(&account_id, &user);
     }
 }

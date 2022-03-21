@@ -25,11 +25,13 @@ pub struct Task {
     pub price: Balance,
     pub proposals: UnorderedMap<ValidAccountId, Proposal>,
     pub available_until: Timestamp,
+    pub category_id: CategoryId,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct User {
     pub account_id: ValidAccountId,
+    pub bio: String,
     pub user_type: UserType,
     pub current_jobs: UnorderedSet<TaskId>,
     pub completed_jobs: UnorderedSet<TaskId>,
@@ -41,4 +43,5 @@ pub struct Proposal {
     pub account_id: ValidAccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
     pub is_approved: bool,
+    pub is_rejected: bool,
 }

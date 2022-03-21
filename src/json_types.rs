@@ -10,6 +10,7 @@ pub struct WrappedTask {
     pub price: WrappedBalance,
     pub proposals: Vec<WrappedProposal>,
     pub available_until: WrappedTimestamp,
+    pub category_id: CategoryId,
 }
 
 impl From<Task> for WrappedTask {
@@ -28,6 +29,7 @@ impl From<Task> for WrappedTask {
             price: WrappedBalance::from(task.price),
             proposals: wrapped_proposal,
             available_until: WrappedTimestamp::from(task.available_until),
+            category_id: task.category_id,
         }
     }
 }
@@ -36,6 +38,7 @@ impl From<Task> for WrappedTask {
 #[serde(crate = "near_sdk::serde")]
 pub struct WrappedUser {
     pub account_id: ValidAccountId,
+    pub bio: String,
     pub user_type: UserType,
     pub completed_jobs: Vec<TaskId>,
 }
