@@ -9,6 +9,7 @@ pub struct WrappedTask {
     pub max_participants: u16,
     pub price: WrappedBalance,
     pub proposals: Vec<WrappedProposal>,
+    pub created_at: WrappedTimestamp,
     pub available_until: WrappedTimestamp,
     pub category_id: CategoryId,
 }
@@ -28,6 +29,7 @@ impl From<Task> for WrappedTask {
             max_participants: task.max_participants,
             price: WrappedBalance::from(task.price),
             proposals: wrapped_proposal,
+            created_at: WrappedTimestamp::from(task.created_at),
             available_until: WrappedTimestamp::from(task.available_until),
             category_id: task.category_id,
         }
@@ -84,6 +86,7 @@ pub struct WrappedProposal {
     pub account_id: ValidAccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
     pub is_approved: bool,
+    pub is_reject: bool,
 }
 
 impl From<Proposal> for WrappedProposal {
@@ -92,6 +95,7 @@ impl From<Proposal> for WrappedProposal {
             account_id: proposal.account_id,
             proof_of_work: proposal.proof_of_work,
             is_approved: proposal.is_approved,
+            is_reject: proposal.is_rejected,
         }
     }
 }

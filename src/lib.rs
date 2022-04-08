@@ -178,6 +178,7 @@ impl Dupwork {
                     price: price.into(),
                     max_participants,
                     proposals: UnorderedMap::new(proposal_prefix),
+                    created_at: env::block_timestamp(),
                     available_until: env::block_timestamp() + unwrap_duration,
                     category_id: category_id.clone(),
                 };
@@ -259,29 +260,44 @@ impl Dupwork {
         assert!(
             task.proposals
                 .iter()
-                .filter(|(_k, v)| v.is_approved == false)
+                .filter(|(_k, v)| v.is_approved == false && v.is_rejected == false)
                 .count()
                 == 0,
             "Some work remains unchecked"
         );
 
-        if task.proposals.len() < task.max_participants as u64 {
+        if task
+            .proposals
+            .iter()
+            .filter(|(_k, v)| v.is_approved == true)
+            .count()
+            <= task.max_participants as usize
+        {
             let refund: u64 = (task.max_participants as u64) - task.proposals.len();
 
             let amount_to_transfer = (task.price as u128)
                 .checked_mul(refund.into())
                 .expect("Can not calculate amount to refund");
 
-            Promise::new(beneficiary_id.to_string())
-                .transfer(amount_to_transfer)
-                .then(ext_self::on_refund(
-                    task_id,
-                    beneficiary_id,
-                    amount_to_transfer,
-                    &env::current_account_id(),
-                    0,
-                    DEFAULT_GAS_TO_PAY,
-                ));
+            Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
+
+            let mut owner = self.users.get(&beneficiary_id).expect("Not found owner");
+            owner.completed_jobs.insert(&task_id);
+            owner.current_jobs.remove(&task_id);
+
+            if let UserType::Requester {
+                total_transfered,
+                current_requests,
+            } = owner.user_type
+            {
+                assert!(current_requests > 0, "Current requests is zero!");
+                owner.user_type = UserType::Requester {
+                    total_transfered: total_transfered + amount_to_transfer,
+                    current_requests: current_requests - 1,
+                };
+
+                self.users.insert(&beneficiary_id, &owner);
+            }
         } else {
             panic!("Some err need to check!");
         }
@@ -347,8 +363,7 @@ impl Dupwork {
         let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
         let mut user = self
             .users
-            .get(&account_id)
-            .expect("You are not a member of dupwork");
+            .get(&account_id).expect("User not found");
 
         user.bio = bio;
         self.users.insert(&account_id, &user);

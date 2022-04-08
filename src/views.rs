@@ -1,5 +1,3 @@
-use std::vec;
-
 use crate::*;
 use near_sdk::serde_json::{json, Value};
 
@@ -40,18 +38,17 @@ impl Dupwork {
             .users
             .get(&account_id)
             .expect("User not found")
-            .current_jobs;
+            .current_jobs
+            .to_vec();
 
-        tasks_id
-            .iter()
-            .map(|k| {
+        (from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
+            .map(|index| {
+                let key = tasks_id.get(index as usize).unwrap();
                 (
-                    k.clone(),
-                    WrappedTask::from(self.tasks_recores.get(&k).unwrap()),
+                    key.clone(),
+                    WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
                 )
             })
-            .filter(|(_k, v)| v.proposals.len() > 0)
-            .map(|(k, task)| (k, WrappedTask::from(task)))
             .collect()
     }
 
@@ -65,14 +62,15 @@ impl Dupwork {
             .users
             .get(&account_id)
             .expect("User not found")
-            .completed_jobs;
+            .completed_jobs
+            .to_vec();
 
-        tasks_id
-            .iter()
-            .map(|k| {
+        (from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
+            .map(|index| {
+                let key = tasks_id.get(index as usize).unwrap();
                 (
-                    k.clone(),
-                    WrappedTask::from(self.tasks_recores.get(&k).unwrap()),
+                    key.clone(),
+                    WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
                 )
             })
             .collect()
@@ -99,9 +97,9 @@ impl Dupwork {
             .expect("Task not found")
     }
 
-    pub fn tasks_by_ids(&self, ids: Vec<String>) -> Vec<WrappedTask> {
+    pub fn tasks_by_ids(&self, ids: Vec<String>) -> Vec<(String, WrappedTask)> {
         ids.iter()
-            .map(|id| self.task_by_id(id.to_string()))
+            .map(|id| (id.clone(), self.task_by_id(id.to_string())))
             .collect()
     }
 

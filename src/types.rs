@@ -24,6 +24,7 @@ pub struct Task {
     pub max_participants: u16,
     pub price: Balance,
     pub proposals: UnorderedMap<ValidAccountId, Proposal>,
+    pub created_at: Timestamp,
     pub available_until: Timestamp,
     pub category_id: CategoryId,
 }
