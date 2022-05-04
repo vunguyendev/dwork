@@ -114,4 +114,8 @@ impl Dupwork {
             })
             .collect()
     }
+
+    pub fn maximum_participants_per_task() -> u16 {
+        MAXIMUM_PROPOSAL_AT_ONE_TIME
+    }
 }
