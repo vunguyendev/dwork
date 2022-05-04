@@ -212,6 +212,8 @@ impl Dupwork {
         let proposal = task.proposals.get(&worker_id).expect("Not found proposal");
         let beneficiary_id = proposal.account_id;
         let amount_to_transfer = task.price.into();
+
+        assert!(!proposal.is_rejected, "You already rejected this worker!!");
         // Make a transfer to the worker
         Promise::new(beneficiary_id.to_string())
             .transfer(amount_to_transfer + SUBMIT_BOND)
@@ -235,7 +237,9 @@ impl Dupwork {
         );
 
         let mut proposal = task.proposals.get(&worker_id).expect("Not found proposal");
+        assert!(!proposal.is_approved, "You already approved this worker!!");
         proposal.is_rejected = true;
+
         task.proposals.insert(&worker_id, &proposal);
         self.tasks_recores.insert(&task_id, &task);
 
@@ -253,11 +257,6 @@ impl Dupwork {
         );
 
         assert!(
-            task.available_until < env::block_timestamp(),
-            "This request is not expire, you can not mark it completed!"
-        );
-
-        assert!(
             task.proposals
                 .iter()
                 .filter(|(_k, v)| v.is_approved == false && v.is_rejected == false)
@@ -266,41 +265,44 @@ impl Dupwork {
             "Some work remains unchecked"
         );
 
-        if task
+        let completed_proposals_count = task
             .proposals
             .iter()
             .filter(|(_k, v)| v.is_approved == true)
-            .count()
-            <= task.max_participants as usize
-        {
-            let refund: u64 = (task.max_participants as u64) - task.proposals.len();
+            .count();
 
-            let amount_to_transfer = (task.price as u128)
-                .checked_mul(refund.into())
-                .expect("Can not calculate amount to refund");
+        let refund: u64 = (task.max_participants as u64) - task.proposals.len();
+
+        let amount_to_transfer = (task.price as u128)
+            .checked_mul(refund.into())
+            .expect("Can not calculate amount to refund");
+        if completed_proposals_count < task.max_participants as usize {
+            assert!(
+                task.available_until < env::block_timestamp(),
+                "This request is not expire, you can not mark it completed!"
+            );
 
             Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
-
-            let mut owner = self.users.get(&beneficiary_id).expect("Not found owner");
-            owner.completed_jobs.insert(&task_id);
-            owner.current_jobs.remove(&task_id);
-
-            if let UserType::Requester {
-                total_transfered,
-                current_requests,
-            } = owner.user_type
-            {
-                assert!(current_requests > 0, "Current requests is zero!");
-                owner.user_type = UserType::Requester {
-                    total_transfered: total_transfered + amount_to_transfer,
-                    current_requests: current_requests - 1,
-                };
-
-                self.users.insert(&beneficiary_id, &owner);
-            }
-        } else {
-            panic!("Some err need to check!");
         }
+
+        let mut owner = self.users.get(&beneficiary_id).expect("Not found owner");
+        owner.completed_jobs.insert(&task_id);
+        owner.current_jobs.remove(&task_id);
+
+        if let UserType::Requester {
+            total_transfered,
+            current_requests,
+        } = owner.user_type
+        {
+            assert!(current_requests > 0, "Current requests is zero!");
+            owner.user_type = UserType::Requester {
+                total_transfered: total_transfered + amount_to_transfer,
+                current_requests: current_requests - 1,
+            };
+
+            self.users.insert(&beneficiary_id, &owner);
+        }
+        // panic!("Some err need to check!");
     }
 
     #[payable]
@@ -361,9 +363,7 @@ impl Dupwork {
     //Account logic
     pub fn update_bio(&mut self, bio: String) {
         let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-        let mut user = self
-            .users
-            .get(&account_id).expect("User not found");
+        let mut user = self.users.get(&account_id).expect("User not found");
 
         user.bio = bio;
         self.users.insert(&account_id, &user);

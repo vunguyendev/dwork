@@ -41,7 +41,19 @@ impl Dupwork {
             .current_jobs
             .to_vec();
 
-        (from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
+        let from = if tasks_id.len() as u64 > (limit + from_index) {
+            tasks_id.len() as u64 - limit - from_index
+        } else {
+            0
+        };
+
+        let to = if tasks_id.len() as u64 > from_index {
+            tasks_id.len() as u64 - from_index
+        } else {
+            0
+        };
+
+        (from..to)
             .map(|index| {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
@@ -49,6 +61,7 @@ impl Dupwork {
                     WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
                 )
             })
+            .rev()
             .collect()
     }
 
@@ -65,7 +78,19 @@ impl Dupwork {
             .completed_jobs
             .to_vec();
 
-        (from_index..std::cmp::min(from_index + limit, tasks_id.len() as u64))
+        let from = if tasks_id.len() as u64 > (limit + from_index) {
+            tasks_id.len() as u64 - limit - from_index
+        } else {
+            0
+        };
+
+        let to = if tasks_id.len() as u64 > from_index {
+            tasks_id.len() as u64 - from_index
+        } else {
+            0
+        };
+
+        (from..to)
             .map(|index| {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
@@ -73,6 +98,7 @@ impl Dupwork {
                     WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
                 )
             })
+            .rev()
             .collect()
     }
 
@@ -115,7 +141,7 @@ impl Dupwork {
             .collect()
     }
 
-    pub fn maximum_participants_per_task() -> u16 {
+    pub fn maximum_participants_per_task(&self) -> u16 {
         MAXIMUM_PROPOSAL_AT_ONE_TIME
     }
 }
