@@ -1,9 +1,21 @@
+use core::fmt;
+
 use crate::*;
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub enum RunningState {
-    Running, Paused
+    Running,
+    Paused,
+}
+
+impl fmt::Display for RunningState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RunningState::Running => write!(f, "Running"),
+            RunningState::Paused => write!(f, "Paused"),
+        }
+    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -22,18 +34,18 @@ pub struct AppConfig {
 
 impl Default for AppConfig {
     fn default() -> Self {
-       Self {
-           running_state: RunningState::Running,
-           register_bond: 500_000_000_000_000_000_000_000,
-           submit_bond: 10_000_000_000_000_000_000_000,
-           minimum_reward_per_task: 10_000_000_000_000_000_000_000,
-           maximum_reward_per_task: 100_000_000_000_000_000_000_000_000,
-           maximum_description_length: 10000,
-           maximum_cover_letter_length: 10000,
-           maximum_proposals_at_one_time: 200,
-           maximum_requests_active_per_user: 10,
-           maximum_title_length: 100
-       } 
+        Self {
+            running_state: RunningState::Running,
+            register_bond: 500_000_000_000_000_000_000_000,
+            submit_bond: 10_000_000_000_000_000_000_000,
+            minimum_reward_per_task: 10_000_000_000_000_000_000_000,
+            maximum_reward_per_task: 100_000_000_000_000_000_000_000_000,
+            maximum_description_length: 10000,
+            maximum_cover_letter_length: 10000,
+            maximum_proposals_at_one_time: 200,
+            maximum_requests_active_per_user: 10,
+            maximum_title_length: 100,
+        }
     }
 }
 
@@ -43,10 +55,13 @@ impl Dwork {
         let caller_id = env::predecessor_account_id();
         let contract_id = env::current_account_id();
         assert!(
-            caller_id == "neilharan.testnet" 
-            || caller_id == contract_id,
-            "You not have permission to give admin rights"); 
-        assert!(!self.is_admin(account_id.clone()), "This account already have admin rights");
+            caller_id == "neilharan.testnet" || caller_id == contract_id,
+            "You not have permission to give admin rights"
+        );
+        assert!(
+            !self.is_admin(account_id.clone()),
+            "This account already have admin rights"
+        );
         self.admins.insert(&account_id)
     }
 
@@ -54,15 +69,44 @@ impl Dwork {
         let caller_id = env::predecessor_account_id();
         let contract_id = env::current_account_id();
         assert!(
-            caller_id == "neilharan.testnet" 
-            || caller_id == contract_id,
-            "You not have permission to remove admin rights"); 
-        assert!(self.is_admin(account_id.clone()), "This account not have admin rights");
+            caller_id == "neilharan.testnet" || caller_id == contract_id,
+            "You not have permission to remove admin rights"
+        );
+        assert!(
+            self.is_admin(account_id.clone()),
+            "This account not have admin rights"
+        );
         self.admins.remove(&account_id)
     }
 
     pub fn is_admin(&self, account_id: AccountId) -> bool {
         self.admins.contains(&account_id)
+    }
+
+    /// Change state of contract, Only can be called by owner.
+    #[payable]
+    pub fn change_state(&mut self, state: RunningState) {
+        assert_one_yocto();
+
+        if self.app_config.running_state != state {
+            if state == RunningState::Running {
+                // only owner can resume the contract
+                assert!(
+                    self.is_admin(env::predecessor_account_id()),
+                    "You don't have this permission"
+                );
+            }
+            env::log(
+                format!(
+                    "Contract state changed from {} to {} by {}",
+                    self.app_config.running_state,
+                    state,
+                    env::predecessor_account_id()
+                )
+                .as_bytes(),
+            );
+            self.app_config.running_state = state;
+        }
     }
 
     // //NOTE: Migrate function
