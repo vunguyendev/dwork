@@ -11,7 +11,7 @@ pub trait ExtDupwork {
 }
 
 #[near_bindgen]
-impl Dupwork {
+impl Dwork {
     // Ext
     pub fn on_refund(
         &mut self,

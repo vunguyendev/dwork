@@ -80,22 +80,3 @@ impl From<UserType> for WrappedUserType {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct WrappedProposal {
-    pub account_id: AccountId,
-    pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
-    pub is_approved: bool,
-    pub is_reject: bool,
-}
-
-impl From<Proposal> for WrappedProposal {
-    fn from(proposal: Proposal) -> Self {
-        WrappedProposal {
-            account_id: proposal.account_id,
-            proof_of_work: proposal.proof_of_work,
-            is_approved: proposal.is_approved,
-            is_reject: proposal.is_rejected,
-        }
-    }
-}

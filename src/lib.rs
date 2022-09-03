@@ -1,5 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
+use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
@@ -7,16 +7,17 @@ use near_sdk::{
     Gas, PanicOnDefault, Promise, PromiseResult, Timestamp,
 };
 
+pub const DEFAULT_GAS_TO_PAY: Gas = 20_000_000_000_000;
 
+pub use crate::admin::*;
 pub use crate::categories::*;
-pub use crate::constants::*;
 pub use crate::ext::*;
 pub use crate::json_types::*;
 pub use crate::types::*;
 pub use crate::views::*;
 
+mod admin;
 mod categories;
-mod constants;
 mod ext;
 mod json_types;
 mod types;
@@ -30,20 +31,23 @@ pub(crate) enum StorageKey {
     UserCurrentTasks { account_id: AccountId },
     UserCompletedTasks { account_id: AccountId },
     ProposalsPerTask { task_id: String },
+    Admins,
 }
 
 setup_alloc!();
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct Dupwork {
+pub struct Dwork {
     task_recores: UnorderedMap<TaskId, Task>,
     users: LookupMap<AccountId, User>,
     categories: UnorderedMap<CategoryId, Category>,
+    admins: LookupSet<AccountId>,
+    app_config: AppConfig,
 }
 
 #[near_bindgen]
-impl Dupwork {
+impl Dwork {
     #[init]
     pub fn new() -> Self {
         assert!(!env::state_exists(), "The contract is already initialized",);
@@ -52,15 +56,17 @@ impl Dupwork {
             task_recores: UnorderedMap::new(StorageKey::TaskRecores),
             users: LookupMap::new(StorageKey::Users),
             categories: UnorderedMap::new(StorageKey::Categories),
+            admins: LookupSet::new(StorageKey::Admins),
+            app_config: AppConfig::default(),
         }
     }
 
     #[payable]
     pub fn register(&mut self, requester: bool) {
         assert!(
-            env::attached_deposit() == REGISTER_BOND,
+            env::attached_deposit() == self.app_config.register_bond,
             "Send exactly {:?} Near to register",
-            REGISTER_BOND
+            self.app_config.register_bond
         );
 
         let account_id = env::predecessor_account_id();
@@ -107,7 +113,7 @@ impl Dupwork {
             .get(&account_id)
             .expect("You are not a member of dWork");
 
-        Promise::new(env::predecessor_account_id()).transfer(REGISTER_BOND);
+        Promise::new(env::predecessor_account_id()).transfer(self.app_config.register_bond);
         self.users.remove(&account_id);
     }
 
@@ -141,11 +147,11 @@ impl Dupwork {
         );
 
         assert!(
-            env::attached_deposit() >= MINIMUM_PRICE_PER_TASK
-                && env::attached_deposit() <= MAXIMUM_PRICE_PER_TASK,
+            env::attached_deposit() >= self.app_config.minimum_reward_per_task
+                && env::attached_deposit() <= self.app_config.maximum_reward_per_task,
             "Total amount for each task must be in a range from {} to {}",
-            MINIMUM_PRICE_PER_TASK,
-            MAXIMUM_PRICE_PER_TASK
+            self.app_config.minimum_reward_per_task,
+            self.app_config.maximum_reward_per_task
         );
 
         match user.user_type {
@@ -155,14 +161,14 @@ impl Dupwork {
                 current_requests,
             } => {
                 assert!(
-                    description.len() <= MAXIMUM_DESCRIPTION_LENGTH,
+                    description.len() <= self.app_config.maximum_description_length.into(),
                     "Description too long"
                 );
 
                 assert!(
-                    max_participants <= MAXIMUM_PROPOSAL_AT_ONE_TIME,
+                    max_participants <= self.app_config.maximum_proposals_at_one_time,
                     "Only accept {} at one time",
-                    MAXIMUM_PROPOSAL_AT_ONE_TIME
+                    self.app_config.maximum_proposals_at_one_time
                 );
 
                 let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
@@ -180,7 +186,9 @@ impl Dupwork {
                     description,
                     price: price.into(),
                     max_participants,
-                    proposals: UnorderedMap::new(StorageKey::ProposalsPerTask { task_id: task_id.clone() }),
+                    proposals: UnorderedMap::new(StorageKey::ProposalsPerTask {
+                        task_id: task_id.clone(),
+                    }),
                     created_at: env::block_timestamp(),
                     available_until: env::block_timestamp() + unwrap_duration,
                     category_id: category_id.clone(),
@@ -224,7 +232,7 @@ impl Dupwork {
         assert!(!proposal.is_rejected, "You already rejected this worker!!");
         // Make a transfer to the worker
         Promise::new(beneficiary_id.to_string())
-            .transfer(amount_to_transfer + SUBMIT_BOND)
+            .transfer(amount_to_transfer + self.app_config.submit_bond)
             .then(ext_self::on_transferd(
                 task_id,
                 beneficiary_id,
@@ -316,9 +324,9 @@ impl Dupwork {
     #[payable]
     pub fn submit_work(&mut self, task_id: String, proof: String) {
         assert!(
-            env::attached_deposit() == SUBMIT_BOND,
+            env::attached_deposit() == self.app_config.submit_bond,
             "Send exactly {:?} Near to register",
-            SUBMIT_BOND
+            self.app_config.submit_bond
         );
 
         let mut task = self.task_recores.get(&task_id).expect("Job not exist");

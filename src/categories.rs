@@ -12,17 +12,14 @@ pub struct Category {
 pub type CategoryId = String;
 
 #[near_bindgen]
-impl Dupwork {
-    pub fn new_category(
-        &mut self,
-        topic_name: String,
-    ) -> bool {
+impl Dwork {
+    pub fn new_category(&mut self, topic_name: String) -> bool {
         let topic_id = topic_name.to_lowercase().replace(' ', "_");
 
         assert!(
-            topic_name.len() <= MAX_TITLE_LENGTH,
+            topic_name.len() <= self.app_config.maximum_title_length.into(),
             "Can not make a post title more than {} characters",
-            MAX_TITLE_LENGTH
+            self.app_config.maximum_title_length
         );
 
         assert!(

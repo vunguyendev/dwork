@@ -2,7 +2,7 @@ use crate::*;
 use near_sdk::serde_json::{json, Value};
 
 #[near_bindgen]
-impl Dupwork {
+impl Dwork {
     pub fn available_tasks(&self, from_index: u64, limit: u64) -> Vec<(TaskId, WrappedTask)> {
         let tasks_id = self.task_recores.keys_as_vector();
 
@@ -142,6 +142,6 @@ impl Dupwork {
     }
 
     pub fn maximum_participants_per_task(&self) -> u16 {
-        MAXIMUM_PROPOSAL_AT_ONE_TIME
+        self.app_config.maximum_proposals_at_one_time
     }
 }
