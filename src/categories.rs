@@ -17,7 +17,7 @@ impl Dupwork {
         &mut self,
         topic_name: String,
     ) -> bool {
-        let topic_id = topic_name.to_lowercase().replace(" ", "_");
+        let topic_id = topic_name.to_lowercase().replace(' ', "_");
 
         assert!(
             topic_name.len() <= MAX_TITLE_LENGTH,
@@ -26,7 +26,7 @@ impl Dupwork {
         );
 
         assert!(
-            !self.categories.get(&topic_id.clone()).is_some(),
+            self.categories.get(&topic_id).is_none(),
             "Topic already exists"
         );
 
@@ -36,12 +36,12 @@ impl Dupwork {
         let topic = Category {
             id: topic_id.clone(),
             name: topic_name,
-            created: env::block_timestamp().into(),
+            created: env::block_timestamp(),
             num_posts: 0,
         };
 
-        self.categories.insert(&topic_id.clone(), &topic);
+        self.categories.insert(&topic_id, &topic);
         // self.finalize_storage_update(storage_update);
-        return true;
+        true
     }
 }

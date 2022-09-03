@@ -3,10 +3,10 @@ use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    env, ext_contract, near_bindgen, setup_alloc, Balance, Duration, Gas, PanicOnDefault, Promise,
-    PromiseResult, Timestamp,
+    env, ext_contract, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
+    Gas, PanicOnDefault, Promise, PromiseResult, Timestamp,
 };
-use std::convert::TryFrom;
+
 
 pub use crate::categories::*;
 pub use crate::constants::*;
@@ -22,13 +22,23 @@ mod json_types;
 mod types;
 mod views;
 
+#[derive(BorshStorageKey, BorshSerialize)]
+pub(crate) enum StorageKey {
+    TaskRecores,
+    Users,
+    Categories,
+    UserCurrentTasks { account_id: AccountId },
+    UserCompletedTasks { account_id: AccountId },
+    ProposalsPerTask { task_id: String },
+}
+
 setup_alloc!();
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Dupwork {
-    tasks_recores: UnorderedMap<TaskId, Task>,
-    users: LookupMap<ValidAccountId, User>,
+    task_recores: UnorderedMap<TaskId, Task>,
+    users: LookupMap<AccountId, User>,
     categories: UnorderedMap<CategoryId, Category>,
 }
 
@@ -39,9 +49,9 @@ impl Dupwork {
         assert!(!env::state_exists(), "The contract is already initialized",);
 
         Self {
-            tasks_recores: UnorderedMap::new(b"tasks_recores".to_vec()),
-            users: LookupMap::new(b"users".to_vec()),
-            categories: UnorderedMap::new(b"categories".to_vec()),
+            task_recores: UnorderedMap::new(StorageKey::TaskRecores),
+            users: LookupMap::new(StorageKey::Users),
+            categories: UnorderedMap::new(StorageKey::Categories),
         }
     }
 
@@ -53,15 +63,7 @@ impl Dupwork {
             REGISTER_BOND
         );
 
-        let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-        let mut current_jobs_prefix = Vec::with_capacity(33);
-        current_jobs_prefix.push(b'c');
-        current_jobs_prefix.extend(env::sha256(env::predecessor_account_id().as_bytes()));
-
-        let mut completed_jobs_prefix = Vec::with_capacity(33);
-        completed_jobs_prefix.push(b'd');
-        completed_jobs_prefix.extend(env::sha256(env::predecessor_account_id().as_bytes()));
-
+        let account_id = env::predecessor_account_id();
         if requester {
             let user = User {
                 account_id: account_id.clone(),
@@ -70,8 +72,12 @@ impl Dupwork {
                     current_requests: 0,
                 },
                 bio: "A member of dWork".to_string(),
-                completed_jobs: UnorderedSet::new(completed_jobs_prefix),
-                current_jobs: UnorderedSet::new(current_jobs_prefix),
+                completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
+                    account_id: account_id.clone(),
+                }),
+                current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
+                    account_id: account_id.clone(),
+                }),
             };
 
             self.users.insert(&account_id, &user);
@@ -83,8 +89,12 @@ impl Dupwork {
                     total_received: 0,
                     current_applies: 0,
                 },
-                completed_jobs: UnorderedSet::new(completed_jobs_prefix),
-                current_jobs: UnorderedSet::new(current_jobs_prefix),
+                completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
+                    account_id: account_id.clone(),
+                }),
+                current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
+                    account_id: account_id.clone(),
+                }),
             };
 
             self.users.insert(&account_id, &user);
@@ -92,13 +102,12 @@ impl Dupwork {
     }
 
     pub fn leave(&mut self) {
-        let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let account_id = env::predecessor_account_id();
         self.users
             .get(&account_id)
-            .expect("You are not a member of dupwork");
+            .expect("You are not a member of dWork");
 
         Promise::new(env::predecessor_account_id()).transfer(REGISTER_BOND);
-
         self.users.remove(&account_id);
     }
 
@@ -114,12 +123,11 @@ impl Dupwork {
         category_id: CategoryId,
     ) {
         //TODO: Maximum deposit
-        //
-        let owner = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let owner = env::predecessor_account_id();
         let mut user = self
             .users
             .get(&owner)
-            .expect("You are not a member of dupwork");
+            .expect("You are not a member of dWork");
 
         let unwrap_balance: Balance = price.into();
         let amount_need_to_pay: Balance = (max_participants as u128)
@@ -160,14 +168,9 @@ impl Dupwork {
                 let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
 
                 assert!(
-                    !self.tasks_recores.get(&task_id).is_some(),
+                    self.task_recores.get(&task_id).is_none(),
                     "Can't post twice per block"
                 );
-
-                let mut proposal_prefix = Vec::with_capacity(33);
-                // Adding unique prefix.
-                proposal_prefix.push(b'p');
-                proposal_prefix.extend(env::sha256(task_id.as_bytes()));
 
                 let unwrap_duration: Duration = duration.into();
 
@@ -177,7 +180,7 @@ impl Dupwork {
                     description,
                     price: price.into(),
                     max_participants,
-                    proposals: UnorderedMap::new(proposal_prefix),
+                    proposals: UnorderedMap::new(StorageKey::ProposalsPerTask { task_id: task_id.clone() }),
                     created_at: env::block_timestamp(),
                     available_until: env::block_timestamp() + unwrap_duration,
                     category_id: category_id.clone(),
@@ -191,7 +194,7 @@ impl Dupwork {
                     panic!("Not found your category");
                 }
 
-                self.tasks_recores.insert(&task_id, &task);
+                self.task_recores.insert(&task_id, &task);
                 //Update user current requests
                 user.user_type = UserType::Requester {
                     total_transfered,
@@ -203,15 +206,20 @@ impl Dupwork {
         }
     }
 
-    pub fn approve_work(&mut self, task_id: TaskId, worker_id: ValidAccountId) {
-        let task = self.tasks_recores.get(&task_id).expect("Job not exist");
+    pub fn approve_work(&mut self, task_id: TaskId, worker_id: AccountId) {
+        let task = self.task_recores.get(&task_id).expect("Task doesn't exist");
 
-        let owner = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-        assert!(task.owner == owner, "Only owner can approve proposal");
+        assert!(
+            task.owner == env::predecessor_account_id(),
+            "Only owner can approve proposal"
+        );
 
-        let proposal = task.proposals.get(&worker_id).expect("Not found proposal");
+        let proposal = task
+            .proposals
+            .get(&worker_id)
+            .expect("Proposal doesn't found");
         let beneficiary_id = proposal.account_id;
-        let amount_to_transfer = task.price.into();
+        let amount_to_transfer = task.price;
 
         assert!(!proposal.is_rejected, "You already rejected this worker!!");
         // Make a transfer to the worker
@@ -227,10 +235,10 @@ impl Dupwork {
             ));
     }
 
-    pub fn reject_work(&mut self, task_id: TaskId, worker_id: ValidAccountId) {
-        let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
+    pub fn reject_work(&mut self, task_id: TaskId, worker_id: AccountId) {
+        let mut task = self.task_recores.get(&task_id).expect("Job not exist");
 
-        let beneficiary_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let beneficiary_id = env::predecessor_account_id();
         assert!(
             task.owner == beneficiary_id,
             "Only owner can reject proposal"
@@ -241,16 +249,16 @@ impl Dupwork {
         proposal.is_rejected = true;
 
         task.proposals.insert(&worker_id, &proposal);
-        self.tasks_recores.insert(&task_id, &task);
+        self.task_recores.insert(&task_id, &task);
 
         // let amount_to_transfer: Balance = task.price.into();
         // Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
     }
 
     pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
-        let task = self.tasks_recores.get(&task_id).expect("Job not exist");
+        let task = self.task_recores.get(&task_id).expect("Job not exist");
 
-        let beneficiary_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let beneficiary_id = env::predecessor_account_id();
         assert!(
             task.owner == beneficiary_id,
             "Only owner can reject proposal"
@@ -259,7 +267,7 @@ impl Dupwork {
         assert!(
             task.proposals
                 .iter()
-                .filter(|(_k, v)| v.is_approved == false && v.is_rejected == false)
+                .filter(|(_k, v)| !v.is_approved && !v.is_rejected)
                 .count()
                 == 0,
             "Some work remains unchecked"
@@ -268,7 +276,7 @@ impl Dupwork {
         let completed_proposals_count = task
             .proposals
             .iter()
-            .filter(|(_k, v)| v.is_approved == true)
+            .filter(|(_k, v)| v.is_approved)
             .count();
 
         let refund: u64 = (task.max_participants as u64) - task.proposals.len();
@@ -313,7 +321,7 @@ impl Dupwork {
             SUBMIT_BOND
         );
 
-        let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
+        let mut task = self.task_recores.get(&task_id).expect("Job not exist");
 
         assert!(
             task.available_until > env::block_timestamp(),
@@ -331,8 +339,7 @@ impl Dupwork {
 
         //TODO increase worker current task
 
-        let worker_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
-
+        let worker_id = env::predecessor_account_id();
         let mut worker = self.users.get(&worker_id).expect("User not found");
 
         if let UserType::Worker {
@@ -357,12 +364,12 @@ impl Dupwork {
         };
 
         task.proposals.insert(&worker_id, &proposal);
-        self.tasks_recores.insert(&task_id, &task);
+        self.task_recores.insert(&task_id, &task);
     }
 
     //Account logic
     pub fn update_bio(&mut self, bio: String) {
-        let account_id = ValidAccountId::try_from(env::predecessor_account_id()).unwrap();
+        let account_id = env::predecessor_account_id();
         let mut user = self.users.get(&account_id).expect("User not found");
 
         user.bio = bio;

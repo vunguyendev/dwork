@@ -5,7 +5,7 @@ pub trait ExtDupwork {
     fn on_transferd(
         &mut self,
         task_id: String,
-        beneficiary_id: ValidAccountId,
+        beneficiary_id: AccountId,
         amount_to_transfer: Balance,
     ) -> bool;
 }
@@ -16,7 +16,7 @@ impl Dupwork {
     pub fn on_refund(
         &mut self,
         task_id: TaskId,
-        owner_id: ValidAccountId,
+        owner_id: AccountId,
         amount_to_transfer: Balance,
     ) -> bool {
         assert!(
@@ -58,7 +58,7 @@ impl Dupwork {
     pub fn on_transferd(
         &mut self,
         task_id: String,
-        beneficiary_id: ValidAccountId,
+        beneficiary_id: AccountId,
         amount_to_transfer: Balance,
     ) -> bool {
         assert!(
@@ -73,7 +73,7 @@ impl Dupwork {
 
         match env::promise_result(0) {
             PromiseResult::Successful(_) => {
-                let mut task = self.tasks_recores.get(&task_id).expect("Job not exist");
+                let mut task = self.task_recores.get(&task_id).expect("Job not exist");
                 let mut proposal = task
                     .proposals
                     .get(&beneficiary_id)
@@ -81,7 +81,7 @@ impl Dupwork {
 
                 proposal.is_approved = true;
                 task.proposals.insert(&beneficiary_id, &proposal);
-                self.tasks_recores.insert(&task_id, &task);
+                self.task_recores.insert(&task_id, &task);
 
                 let mut worker = self.users.get(&beneficiary_id).expect("Not found worker");
                 worker.completed_jobs.insert(&task_id);
@@ -90,7 +90,7 @@ impl Dupwork {
                 if task
                     .proposals
                     .iter()
-                    .filter(|(_k, v)| v.is_approved == true)
+                    .filter(|(_k, v)| v.is_approved)
                     .count() as u16
                     == task.max_participants
                 {

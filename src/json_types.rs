@@ -3,12 +3,12 @@ use crate::*;
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct WrappedTask {
-    pub owner: ValidAccountId,
+    pub owner: AccountId,
     pub title: String,
     pub description: String,
     pub max_participants: u16,
     pub price: WrappedBalance,
-    pub proposals: Vec<WrappedProposal>,
+    pub proposals: Vec<Proposal>,
     pub created_at: WrappedTimestamp,
     pub available_until: WrappedTimestamp,
     pub category_id: CategoryId,
@@ -16,10 +16,10 @@ pub struct WrappedTask {
 
 impl From<Task> for WrappedTask {
     fn from(task: Task) -> Self {
-        let wrapped_proposal: Vec<WrappedProposal> = task
+        let proposals: Vec<Proposal> = task
             .proposals
             .iter()
-            .map(|(_k, item)| WrappedProposal::from(item))
+            .map(|(_k, item)| item)
             .collect();
 
         WrappedTask {
@@ -28,7 +28,7 @@ impl From<Task> for WrappedTask {
             description: task.description,
             max_participants: task.max_participants,
             price: WrappedBalance::from(task.price),
-            proposals: wrapped_proposal,
+            proposals,
             created_at: WrappedTimestamp::from(task.created_at),
             available_until: WrappedTimestamp::from(task.available_until),
             category_id: task.category_id,
@@ -83,7 +83,7 @@ impl From<UserType> for WrappedUserType {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct WrappedProposal {
-    pub account_id: ValidAccountId,
+    pub account_id: AccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
     pub is_approved: bool,
     pub is_reject: bool,

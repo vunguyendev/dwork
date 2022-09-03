@@ -2,7 +2,7 @@ use crate::*;
 
 pub type TaskId = String;
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(crate = "near_sdk::serde")]
 #[serde(tag = "type")]
 pub enum UserType {
@@ -18,12 +18,12 @@ pub enum UserType {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Task {
-    pub owner: ValidAccountId,
+    pub owner: AccountId,
     pub title: String,
     pub description: String,
     pub max_participants: u16,
     pub price: Balance,
-    pub proposals: UnorderedMap<ValidAccountId, Proposal>,
+    pub proposals: UnorderedMap<AccountId, Proposal>,
     pub created_at: Timestamp,
     pub available_until: Timestamp,
     pub category_id: CategoryId,
@@ -31,7 +31,7 @@ pub struct Task {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct User {
-    pub account_id: ValidAccountId,
+    pub account_id: AccountId,
     pub bio: String,
     pub user_type: UserType,
     pub current_jobs: UnorderedSet<TaskId>,
@@ -41,7 +41,7 @@ pub struct User {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Proposal {
-    pub account_id: ValidAccountId,
+    pub account_id: AccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
     pub is_approved: bool,
     pub is_rejected: bool,

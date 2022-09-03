@@ -4,7 +4,7 @@ use near_sdk::serde_json::{json, Value};
 #[near_bindgen]
 impl Dupwork {
     pub fn available_tasks(&self, from_index: u64, limit: u64) -> Vec<(TaskId, WrappedTask)> {
-        let tasks_id = self.tasks_recores.keys_as_vector();
+        let tasks_id = self.task_recores.keys_as_vector();
 
         let from = if tasks_id.len() > (limit + from_index) {
             tasks_id.len() - limit - from_index
@@ -21,8 +21,8 @@ impl Dupwork {
         (from..to)
             .map(|index| {
                 let task_id = tasks_id.get(index as u64).unwrap();
-                let task = self.tasks_recores.get(&task_id.clone()).unwrap();
-                (task_id.clone(), WrappedTask::from(task))
+                let task = self.task_recores.get(&task_id).unwrap();
+                (task_id, WrappedTask::from(task))
             })
             .rev()
             .collect()
@@ -30,7 +30,7 @@ impl Dupwork {
 
     pub fn current_tasks(
         &self,
-        account_id: ValidAccountId,
+        account_id: AccountId,
         from_index: u64,
         limit: u64,
     ) -> Vec<(TaskId, WrappedTask)> {
@@ -58,7 +58,7 @@ impl Dupwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
+                    WrappedTask::from(self.task_recores.get(key).unwrap()),
                 )
             })
             .rev()
@@ -67,7 +67,7 @@ impl Dupwork {
 
     pub fn completed_tasks(
         &self,
-        account_id: ValidAccountId,
+        account_id: AccountId,
         from_index: u64,
         limit: u64,
     ) -> Vec<(TaskId, WrappedTask)> {
@@ -95,14 +95,14 @@ impl Dupwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    WrappedTask::from(self.tasks_recores.get(&key).unwrap()),
+                    WrappedTask::from(self.task_recores.get(key).unwrap()),
                 )
             })
             .rev()
             .collect()
     }
 
-    pub fn user_info(&self, account_id: ValidAccountId) -> Value {
+    pub fn user_info(&self, account_id: AccountId) -> Value {
         self.users
             .get(&account_id)
             .map(|v| {
@@ -117,9 +117,9 @@ impl Dupwork {
     }
 
     pub fn task_by_id(&self, task_id: TaskId) -> WrappedTask {
-        self.tasks_recores
+        self.task_recores
             .get(&task_id)
-            .map(|v| WrappedTask::from(v))
+            .map(WrappedTask::from)
             .expect("Task not found")
     }
 
