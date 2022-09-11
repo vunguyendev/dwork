@@ -2,20 +2,6 @@ use crate::*;
 
 pub type TaskId = String;
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-#[serde(crate = "near_sdk::serde")]
-#[serde(tag = "type")]
-pub enum UserType {
-    Requester {
-        total_transfered: Balance,
-        current_requests: u16,
-    },
-    Worker {
-        total_received: Balance,
-        current_applies: u16,
-    },
-}
-
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Task {
     pub owner: AccountId,
@@ -33,7 +19,9 @@ pub struct Task {
 pub struct User {
     pub account_id: AccountId,
     pub bio: String,
-    pub user_type: UserType,
+    pub total_spent: Balance,
+    pub total_earn: Balance,
+    pub locked_balance: Balance,
     pub current_jobs: UnorderedSet<TaskId>,
     pub completed_jobs: UnorderedSet<TaskId>,
 }

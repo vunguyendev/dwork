@@ -109,8 +109,11 @@ impl Dwork {
                 json!({
                     "account_id": v.account_id,
                     "bio": v.bio,
-                    "user_type": WrappedUserType::from(v.user_type),
-                    "completed_jobs": v.completed_jobs.to_vec()
+                    "completed_jobs": v.completed_jobs.to_vec(),
+                    "current_jobs": v.current_jobs.to_vec(),
+                    "total_earn": v.total_earn,
+                    "total_spent": v.total_spent,
+                    "locked_balance": v.locked_balance
                 })
             })
             .expect("Canot map user to json")

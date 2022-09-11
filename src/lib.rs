@@ -1,6 +1,6 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap, UnorderedSet};
-use near_sdk::json_types::{ValidAccountId, WrappedBalance, WrappedDuration, WrappedTimestamp};
+use near_sdk::json_types::{WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, ext_contract, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
@@ -46,6 +46,7 @@ pub struct Dwork {
     app_config: AppConfig,
 }
 
+//NOTE: We do not keep the submitted bond as a locked balance.
 #[near_bindgen]
 impl Dwork {
     #[init]
@@ -62,7 +63,7 @@ impl Dwork {
     }
 
     #[payable]
-    pub fn register(&mut self, requester: bool) {
+    pub fn register(&mut self) {
         assert!(
             env::attached_deposit() == self.app_config.register_bond,
             "Send exactly {:?} Near to register",
@@ -70,52 +71,33 @@ impl Dwork {
         );
 
         let account_id = env::predecessor_account_id();
-        if requester {
-            let user = User {
+        let user = User {
+            account_id: account_id.clone(),
+            bio: "A member of dWork".to_string(),
+            total_earn: 0,
+            total_spent: 0,
+            locked_balance: env::attached_deposit(),
+            completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
                 account_id: account_id.clone(),
-                user_type: UserType::Requester {
-                    total_transfered: 0,
-                    current_requests: 0,
-                },
-                bio: "A member of dWork".to_string(),
-                completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
-                    account_id: account_id.clone(),
-                }),
-                current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
-                    account_id: account_id.clone(),
-                }),
-            };
-
-            self.users.insert(&account_id, &user);
-        } else {
-            let user = User {
+            }),
+            current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
                 account_id: account_id.clone(),
-                bio: "A member of dWork".to_string(),
-                user_type: UserType::Worker {
-                    total_received: 0,
-                    current_applies: 0,
-                },
-                completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
-                    account_id: account_id.clone(),
-                }),
-                current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
-                    account_id: account_id.clone(),
-                }),
-            };
+            }),
+        };
 
-            self.users.insert(&account_id, &user);
-        }
+        self.users.insert(&account_id, &user);
     }
 
-    pub fn leave(&mut self) {
-        let account_id = env::predecessor_account_id();
-        self.users
-            .get(&account_id)
-            .expect("You are not a member of dWork");
-
-        Promise::new(env::predecessor_account_id()).transfer(self.app_config.register_bond);
-        self.users.remove(&account_id);
-    }
+    //TODO: Define later
+    // pub fn leave(&mut self) {
+    //     let account_id = env::predecessor_account_id();
+    //     let user = self.users
+    //         .get(&account_id)
+    //         .expect("You are not a member of dWork");
+    //
+    //     Promise::new(env::predecessor_account_id()).transfer(self.app_config.register_bond);
+    //     self.users.remove(&account_id);
+    // }
 
     /// Requester sections:
     #[payable]
@@ -154,64 +136,52 @@ impl Dwork {
             self.app_config.maximum_reward_per_task
         );
 
-        match user.user_type {
-            UserType::Worker { .. } => panic!("Only requester can create a task"),
-            UserType::Requester {
-                total_transfered,
-                current_requests,
-            } => {
-                assert!(
-                    description.len() <= self.app_config.maximum_description_length.into(),
-                    "Description too long"
-                );
+        assert!(
+            description.len() <= self.app_config.maximum_description_length.into(),
+            "Description too long"
+        );
 
-                assert!(
-                    max_participants <= self.app_config.maximum_proposals_at_one_time,
-                    "Only accept {} at one time",
-                    self.app_config.maximum_proposals_at_one_time
-                );
+        assert!(
+            max_participants <= self.app_config.maximum_proposals_at_one_time,
+            "Only accept {} at one time",
+            self.app_config.maximum_proposals_at_one_time
+        );
 
-                let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
+        let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
 
-                assert!(
-                    self.task_recores.get(&task_id).is_none(),
-                    "Can't post twice per block"
-                );
+        assert!(
+            self.task_recores.get(&task_id).is_none(),
+            "Can't post twice per block"
+        );
 
-                let unwrap_duration: Duration = duration.into();
+        let unwrap_duration: Duration = duration.into();
 
-                let task = Task {
-                    owner: owner.clone(),
-                    title,
-                    description,
-                    price: price.into(),
-                    max_participants,
-                    proposals: UnorderedMap::new(StorageKey::ProposalsPerTask {
-                        task_id: task_id.clone(),
-                    }),
-                    created_at: env::block_timestamp(),
-                    available_until: env::block_timestamp() + unwrap_duration,
-                    category_id: category_id.clone(),
-                };
+        let task = Task {
+            owner: owner.clone(),
+            title,
+            description,
+            price: price.into(),
+            max_participants,
+            proposals: UnorderedMap::new(StorageKey::ProposalsPerTask {
+                task_id: task_id.clone(),
+            }),
+            created_at: env::block_timestamp(),
+            available_until: env::block_timestamp() + unwrap_duration,
+            category_id: category_id.clone(),
+        };
 
-                //Update num_posts in category
-                if let Some(mut category) = self.categories.get(&category_id) {
-                    category.num_posts += 1;
-                    self.categories.insert(&category_id, &category);
-                } else {
-                    panic!("Not found your category");
-                }
-
-                self.task_recores.insert(&task_id, &task);
-                //Update user current requests
-                user.user_type = UserType::Requester {
-                    total_transfered,
-                    current_requests: current_requests + 1,
-                };
-                user.current_jobs.insert(&task_id);
-                self.users.insert(&owner, &user);
-            }
+        //Update num_posts in category
+        if let Some(mut category) = self.categories.get(&category_id) {
+            category.num_posts += 1;
+            self.categories.insert(&category_id, &category);
+        } else {
+            panic!("Not found your category");
         }
+
+        self.task_recores.insert(&task_id, &task);
+        user.locked_balance += env::attached_deposit();
+        user.current_jobs.insert(&task_id);
+        self.users.insert(&owner, &user);
     }
 
     pub fn approve_work(&mut self, task_id: TaskId, worker_id: AccountId) {
@@ -243,6 +213,7 @@ impl Dwork {
             ));
     }
 
+    //TODO: add reason by owner
     pub fn reject_work(&mut self, task_id: TaskId, worker_id: AccountId) {
         let mut task = self.task_recores.get(&task_id).expect("Job not exist");
 
@@ -304,28 +275,15 @@ impl Dwork {
         let mut owner = self.users.get(&beneficiary_id).expect("Not found owner");
         owner.completed_jobs.insert(&task_id);
         owner.current_jobs.remove(&task_id);
-
-        if let UserType::Requester {
-            total_transfered,
-            current_requests,
-        } = owner.user_type
-        {
-            assert!(current_requests > 0, "Current requests is zero!");
-            owner.user_type = UserType::Requester {
-                total_transfered: total_transfered + amount_to_transfer,
-                current_requests: current_requests - 1,
-            };
-
-            self.users.insert(&beneficiary_id, &owner);
-        }
-        // panic!("Some err need to check!");
+        owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
+        self.users.insert(&beneficiary_id, &owner);
     }
 
     #[payable]
     pub fn submit_work(&mut self, task_id: String, proof: String) {
         assert!(
             env::attached_deposit() == self.app_config.submit_bond,
-            "Send exactly {:?} Near to register",
+            "Send exactly {:?} Near to submit",
             self.app_config.submit_bond
         );
 
@@ -346,23 +304,9 @@ impl Dwork {
         );
 
         //TODO increase worker current task
-
         let worker_id = env::predecessor_account_id();
         let mut worker = self.users.get(&worker_id).expect("User not found");
-
-        if let UserType::Worker {
-            total_received,
-            current_applies,
-        } = worker.user_type
-        {
-            worker.user_type = UserType::Worker {
-                total_received,
-                current_applies: current_applies + 1,
-            };
-
-            worker.current_jobs.insert(&task_id);
-            self.users.insert(&worker_id, &worker);
-        }
+        worker.current_jobs.insert(&task_id);
 
         let proposal = Proposal {
             account_id: worker_id.clone(),
