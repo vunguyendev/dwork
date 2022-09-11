@@ -51,6 +51,31 @@ impl Default for AppConfig {
 
 #[near_bindgen]
 impl Dwork {
+    //Change config by admin
+    pub fn change_config(
+        &mut self,
+        register_bond: Option<Balance>,
+        submit_bond: Option<Balance>,
+        min_reward: Option<Balance>,
+        max_reward: Option<Balance>,
+    ) {
+        if let Some(register_bond) = register_bond {
+            self.app_config.register_bond = register_bond;
+        }
+
+        if let Some(submit_bond) = submit_bond {
+            self.app_config.submit_bond = submit_bond;
+        }
+
+        if let Some(min_reward) = min_reward {
+            self.app_config.minimum_reward_per_task = min_reward;
+        }
+
+        if let Some(max_reward) = max_reward {
+            self.app_config.maximum_reward_per_task = max_reward;
+        }
+    }
+
     pub fn add_admin(&mut self, account_id: AccountId) -> bool {
         let caller_id = env::predecessor_account_id();
         let contract_id = env::current_account_id();
