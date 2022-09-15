@@ -248,6 +248,12 @@ impl Dwork {
         self.task_recores.insert(&task_id, &task);
     }
 
+    #[payable]
+    pub fn report_rejection () {
+        // Condition:
+        //  - Owner of this submittion
+    }
+
     //Account logic
     pub fn update_bio(&mut self, bio: String) {
         let account_id = env::predecessor_account_id();

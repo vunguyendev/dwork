@@ -51,6 +51,10 @@ impl Default for AppConfig {
 
 #[near_bindgen]
 impl Dwork {
+    pub fn is_admin(&self, account_id: AccountId) -> bool {
+        self.admins.contains(&account_id)
+    }
+
     //Change config by admin
     pub fn change_config(
         &mut self,
@@ -102,10 +106,6 @@ impl Dwork {
             "This account not have admin rights"
         );
         self.admins.remove(&account_id)
-    }
-
-    pub fn is_admin(&self, account_id: AccountId) -> bool {
-        self.admins.contains(&account_id)
     }
 
     /// Change state of contract, Only can be called by owner.
