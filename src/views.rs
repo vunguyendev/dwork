@@ -1,5 +1,4 @@
 use crate::*;
-use near_sdk::serde_json::{json, Value};
 
 #[near_bindgen]
 impl Dwork {
@@ -100,23 +99,6 @@ impl Dwork {
             })
             .rev()
             .collect()
-    }
-
-    pub fn user_info(&self, account_id: AccountId) -> Value {
-        self.users
-            .get(&account_id)
-            .map(|v| {
-                json!({
-                    "account_id": v.account_id,
-                    "bio": v.bio,
-                    "completed_jobs": v.completed_jobs.to_vec(),
-                    "current_jobs": v.current_jobs.to_vec(),
-                    "total_earn": v.total_earn,
-                    "total_spent": v.total_spent,
-                    "locked_balance": v.locked_balance
-                })
-            })
-            .expect("Canot map user to json")
     }
 
     pub fn task_by_id(&self, task_id: TaskId) -> WrappedTask {

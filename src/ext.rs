@@ -79,7 +79,7 @@ impl Dwork {
                     .get(&beneficiary_id)
                     .expect("Proposal not found!");
 
-                proposal.is_approved = true;
+                proposal.status = ProposalStatus::Approved;
                 task.proposals.insert(&beneficiary_id, &proposal);
                 self.task_recores.insert(&task_id, &task);
 
@@ -90,7 +90,7 @@ impl Dwork {
                 if task
                     .proposals
                     .iter()
-                    .filter(|(_k, v)| v.is_approved)
+                    .filter(|(_k, v)| {v.status == ProposalStatus::Approved})
                     .count() as u16
                     == task.max_participants
                 {

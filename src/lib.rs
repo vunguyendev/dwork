@@ -2,6 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::serde_json::{json, Value};
 use near_sdk::{
     env, ext_contract, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
     Gas, PanicOnDefault, Promise, PromiseResult, Timestamp,
@@ -15,7 +16,11 @@ pub use crate::ext::*;
 pub use crate::json_types::*;
 pub use crate::types::*;
 pub use crate::views::*;
+
+pub use crate::requester_action::*;
 pub use crate::user::*;
+pub use crate::worker_action::*;
+
 pub use crate::utils::*;
 
 mod admin;
@@ -24,7 +29,11 @@ mod ext;
 mod json_types;
 mod types;
 mod views;
+
+mod requester_action;
 mod user;
+mod worker_action;
+
 mod utils;
 
 setup_alloc!();
@@ -65,12 +74,4 @@ impl Dwork {
     //     Promise::new(env::predecessor_account_id()).transfer(self.app_config.register_bond);
     //     self.users.remove(&account_id);
     // }
-}
-
-pub fn assert_one_yocto() {
-    assert_eq!(
-        env::attached_deposit(),
-        1,
-        "Requires attached deposit of exactly 1 yoctoNEAR"
-    )
 }

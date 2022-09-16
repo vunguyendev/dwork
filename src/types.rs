@@ -15,15 +15,23 @@ pub struct Task {
     pub category_id: CategoryId,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct User {
-    pub account_id: AccountId,
-    pub bio: String,
-    pub total_spent: Balance,
-    pub total_earn: Balance,
-    pub locked_balance: Balance,
-    pub current_jobs: UnorderedSet<TaskId>,
-    pub completed_jobs: UnorderedSet<TaskId>,
+// #[derive(BorshSerialize, BorshDeserialize)]
+// pub struct User {
+//     pub account_id: AccountId,
+//     pub bio: String,
+//     pub total_spent: Balance,
+//     pub total_earn: Balance,
+//     pub locked_balance: Balance,
+//     pub current_jobs: UnorderedSet<TaskId>,
+//     pub completed_jobs: UnorderedSet<TaskId>,
+// }
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
+pub enum ProposalStatus {
+    Pending,
+    Approved,
+    Rejected {reason: String},
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
@@ -31,6 +39,5 @@ pub struct User {
 pub struct Proposal {
     pub account_id: AccountId,
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
-    pub is_approved: bool,
-    pub is_rejected: bool,
+    pub status: ProposalStatus,
 }
