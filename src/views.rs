@@ -34,7 +34,7 @@ impl Dwork {
         limit: u64,
     ) -> Vec<(TaskId, WrappedTask)> {
         let tasks_id = self
-            .users
+            .accounts
             .get(&account_id)
             .expect("User not found")
             .current_jobs
@@ -71,7 +71,7 @@ impl Dwork {
         limit: u64,
     ) -> Vec<(TaskId, WrappedTask)> {
         let tasks_id = self
-            .users
+            .accounts
             .get(&account_id)
             .expect("User not found")
             .completed_jobs

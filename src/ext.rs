@@ -83,7 +83,7 @@ impl Dwork {
                 task.proposals.insert(&beneficiary_id, &proposal);
                 self.task_recores.insert(&task_id, &task);
 
-                let mut worker = self.users.get(&beneficiary_id).expect("Not found worker");
+                let mut worker = self.accounts.get(&beneficiary_id).expect("Not found worker");
                 worker.completed_jobs.insert(&task_id);
                 worker.current_jobs.remove(&task_id);
 
@@ -95,18 +95,18 @@ impl Dwork {
                     == task.max_participants
                 {
                     let owner_id = task.owner;
-                    let mut owner = self.users.get(&owner_id).expect("Not found owner");
+                    let mut owner = self.accounts.get(&owner_id).expect("Not found owner");
                     owner.completed_jobs.insert(&task_id);
                     owner.current_jobs.remove(&task_id);
                     owner.total_spent += task.price * task.max_participants as u128;
 
-                    self.users.insert(&owner_id, &owner);
+                    self.accounts.insert(&owner_id, &owner);
                 }
 
                 worker.current_jobs.remove(&task_id);
                 worker.completed_jobs.insert(&task_id);
                 worker.total_earn += amount_to_transfer;
-                self.users.insert(&beneficiary_id, &worker);
+                self.accounts.insert(&beneficiary_id, &worker);
                 true
             }
             _ => false,

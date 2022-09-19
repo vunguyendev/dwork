@@ -15,10 +15,7 @@ impl Dwork {
     ) {
         //TODO: Maximum deposit
         let owner = env::predecessor_account_id();
-        let mut user = self
-            .users
-            .get(&owner)
-            .expect("You are not a member of dWork");
+        let mut user = self.internal_get_account(&owner);
 
         let unwrap_balance: Balance = price.into();
         let amount_need_to_pay: Balance = (max_participants as u128)
@@ -73,6 +70,8 @@ impl Dwork {
             category_id: category_id.clone(),
         };
 
+        let storage_update = self.new_storage_update(owner.clone());
+        
         //Update num_posts in category
         if let Some(mut category) = self.categories.get(&category_id) {
             category.num_posts += 1;
@@ -84,7 +83,9 @@ impl Dwork {
         self.task_recores.insert(&task_id, &task);
         user.locked_balance += env::attached_deposit();
         user.current_jobs.insert(&task_id);
-        self.users.insert(&owner, &user);
+        self.accounts.insert(&owner, &user);
+
+        self.finalize_storage_update(storage_update);
     }
 
     pub fn approve_work(&mut self, task_id: TaskId, worker_id: AccountId) {
@@ -116,8 +117,8 @@ impl Dwork {
             ));
     }
 
-    //TODO: add reason by owner
-    pub fn reject_work(&mut self, task_id: TaskId, worker_id: AccountId) {
+    //TODO: add reason by owner CHECKED
+    pub fn reject_work(&mut self, task_id: TaskId, worker_id: AccountId, reason: String) {
         let mut task = self.task_recores.get(&task_id).expect("Job not exist");
 
         let beneficiary_id = env::predecessor_account_id();
@@ -125,13 +126,18 @@ impl Dwork {
             task.owner == beneficiary_id,
             "Only owner can reject proposal"
         );
+        
+        let storage_update = self.new_storage_update(beneficiary_id);
 
         let mut proposal = task.proposals.get(&worker_id).expect("Not found proposal");
         assert!(proposal.status != ProposalStatus::Pending, "You already approved or rejected this worker!!");
-        proposal.status = ProposalStatus::Rejected { reason: "".to_string() };
+        
+        proposal.status = ProposalStatus::Rejected { reason };
 
         task.proposals.insert(&worker_id, &proposal);
         self.task_recores.insert(&task_id, &task);
+
+        self.finalize_storage_update(storage_update)
 
         // let amount_to_transfer: Balance = task.price.into();
         // Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer + SUBMIT_BOND);
@@ -175,10 +181,10 @@ impl Dwork {
             Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
         }
 
-        let mut owner = self.users.get(&beneficiary_id).expect("Not found owner");
+        let mut owner = self.accounts.get(&beneficiary_id).expect("Not found owner");
         owner.completed_jobs.insert(&task_id);
         owner.current_jobs.remove(&task_id);
         owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
-        self.users.insert(&beneficiary_id, &owner);
+        self.accounts.insert(&beneficiary_id, &owner);
     }
 }

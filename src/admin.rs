@@ -134,6 +134,17 @@ impl Dwork {
         }
     }
 
+    pub fn approve_report(&mut self, report_id: ReportId) {
+        let mut report = self.reports.get(&report_id).expect("Report not found");
+    }
+
+    pub fn reject_report(&mut self, report_id: ReportId) {
+        let mut report = self.reports.get(&report_id).expect("Report not found");
+        assert!(report.status == ReportStatus::Pending, "Cann't approved this report");
+        report.status = ReportStatus::Rejected;
+        self.reports.insert(&report_id, &report);
+    }
+    
     // //NOTE: Migrate function
     // #[private]
     // #[init(ignore_state)]

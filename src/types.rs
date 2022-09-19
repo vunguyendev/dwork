@@ -32,6 +32,7 @@ pub enum ProposalStatus {
     Pending,
     Approved,
     Rejected {reason: String},
+    Reported {report_id: ReportId}
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
@@ -41,3 +42,5 @@ pub struct Proposal {
     pub proof_of_work: String, //prefer an url like github repo or figma design files, etc
     pub status: ProposalStatus,
 }
+
+

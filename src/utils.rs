@@ -2,7 +2,9 @@ use crate::*;
 
 #[derive(BorshStorageKey, BorshSerialize)]
 pub(crate) enum StorageKey {
+    StorageAccount,
     TaskRecores,
+    Reports,
     Users,
     Categories,
     UserCurrentTasks { account_id: AccountId },
