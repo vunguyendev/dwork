@@ -1,4 +1,5 @@
 use core::fmt;
+use std::future::Pending;
 
 use crate::*;
 
@@ -23,6 +24,7 @@ pub struct AppConfig {
     pub running_state: RunningState,
     pub register_bond: Balance,
     pub submit_bond: Balance,
+    pub report_interval: Timestamp,
     pub minimum_reward_per_task: Balance,
     pub maximum_reward_per_task: Balance,
     pub maximum_description_length: u16,
@@ -30,6 +32,9 @@ pub struct AppConfig {
     pub maximum_proposals_at_one_time: u16,
     pub maximum_requests_active_per_user: u16,
     pub maximum_title_length: u16,
+
+    pub claim_point_bonus: u32, // may be a near bonus was given by requester to pay for who call
+                              // first claim / complete task
 }
 
 impl Default for AppConfig {
@@ -38,6 +43,7 @@ impl Default for AppConfig {
             running_state: RunningState::Running,
             register_bond: 500_000_000_000_000_000_000_000,
             submit_bond: 10_000_000_000_000_000_000_000,
+            report_interval: 172_800_000_000_000, // 2 days
             minimum_reward_per_task: 10_000_000_000_000_000_000_000,
             maximum_reward_per_task: 100_000_000_000_000_000_000_000_000,
             maximum_description_length: 10000,
@@ -45,6 +51,8 @@ impl Default for AppConfig {
             maximum_proposals_at_one_time: 200,
             maximum_requests_active_per_user: 10,
             maximum_title_length: 100,
+
+            claim_point_bonus: 10,
         }
     }
 }
@@ -136,15 +144,41 @@ impl Dwork {
 
     pub fn approve_report(&mut self, report_id: ReportId) {
         let mut report = self.reports.get(&report_id).expect("Report not found");
+        assert!(
+            report.status == ReportStatus::Pending,
+            "Cann't approved this report"
+        );
+        report.status = ReportStatus::Approved;
+
+        self.reports.insert(&report_id, &report);
+
+        let mut task = self
+            .task_recores
+            .get(&report.task_id)
+            .expect("Task not found");
+
+        let mut proposal = task
+            .proposals
+            .get(&report.account_id)
+            .expect("Proposal not found");
+        proposal.status = ProposalStatus::Approved;
+
+        task.proposals.insert(&report.account_id, &proposal);
+        task.approved.push(report.account_id.clone());
+
+        self.task_recores.insert(&report.task_id, &task);
     }
 
     pub fn reject_report(&mut self, report_id: ReportId) {
         let mut report = self.reports.get(&report_id).expect("Report not found");
-        assert!(report.status == ReportStatus::Pending, "Cann't approved this report");
+        assert!(
+            report.status == ReportStatus::Pending,
+            "Cann't approved this report"
+        );
         report.status = ReportStatus::Rejected;
         self.reports.insert(&report_id, &report);
     }
-    
+
     // //NOTE: Migrate function
     // #[private]
     // #[init(ignore_state)]
@@ -169,4 +203,74 @@ impl Dwork {
     //         admins: LookupSet::new(StorageKey::Admins),
     //     }
     // }
+    //
+
+    pub fn check_available_review_report(&self, task_id: TaskId) -> bool {
+        let task = self.task_recores.get(&task_id).expect("Task not found");
+        if let Some(end_review) = task.review_proposal_complete_at {
+            let now = env::block_timestamp();
+            if now > end_review + self.app_config.report_interval {
+                return task
+                    .proposals
+                    .iter()
+                    .filter(|(_k, v)| match &v.status {
+                        ProposalStatus::Reported { report_id } => {
+                            let report = self.reports.get(report_id).expect("Report not found");
+                            report.status == ReportStatus::Pending
+                        }
+                        _ => false,
+                    })
+                    .count()
+                    > 0;
+            }
+        }
+        true
+    }
+
+    pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
+        let task = self.task_recores.get(&task_id).expect("Task not found");
+
+        let beneficiary_id = env::predecessor_account_id();
+        assert!(
+            task.owner == beneficiary_id,
+            "Only owner can reject proposal"
+        );
+
+        assert!(
+            task.proposals
+                .iter()
+                .filter(|(_k, v)| v.status == ProposalStatus::Pending)
+                .count()
+                == 0
+                || task.approved.len() == task.max_participants as usize,
+            "Some work remains unchecked"
+        );
+
+        let completed_proposals_count = task
+            .proposals
+            .iter()
+            .filter(|(_k, v)| v.status == ProposalStatus::Approved)
+            .count();
+
+        let refund: u64 = (task.max_participants as u64) - task.proposals.len();
+
+        let amount_to_transfer = (task.price as u128)
+            .checked_mul(refund.into())
+            .expect("Can not calculate amount to refund");
+        if completed_proposals_count < task.max_participants as usize {
+            assert!(
+                task.submit_available_until < env::block_timestamp(),
+                "This request is not expire, you can not mark it completed!"
+            );
+
+            Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
+        }
+
+        let mut owner = self.accounts.get(&beneficiary_id).expect("Not found owner");
+        owner.completed_jobs.insert(&task_id);
+        owner.current_jobs.remove(&task_id);
+        owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
+        self.accounts.insert(&beneficiary_id, &owner);
+    }
+
 }

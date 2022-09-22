@@ -30,7 +30,7 @@ impl From<Task> for WrappedTask {
             price: WrappedBalance::from(task.price),
             proposals,
             created_at: WrappedTimestamp::from(task.created_at),
-            available_until: WrappedTimestamp::from(task.available_until),
+            available_until: WrappedTimestamp::from(task.submit_available_until),
             category_id: task.category_id,
         }
     }

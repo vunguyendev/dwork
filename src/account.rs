@@ -7,7 +7,7 @@ pub struct Account {
     
     pub total_spent: Balance,
     pub total_earn: Balance,
-    pub locked_balance: Balance,
+    pub balance: Balance,
     
     pub current_jobs: UnorderedSet<TaskId>,
     pub completed_jobs: UnorderedSet<TaskId>,
@@ -29,7 +29,7 @@ impl Dwork {
                     "current_jobs": v.current_jobs.to_vec(),
                     "total_earn": v.total_earn,
                     "total_spent": v.total_spent,
-                    "locked_balance": v.locked_balance
+                    "balance": v.balance
                 })
             })
             .expect("Canot map user to json")
@@ -72,7 +72,7 @@ impl Dwork {
             bio: "A member of dWork".to_string(),
             total_earn: 0,
             total_spent: 0,
-            locked_balance: env::attached_deposit(),
+            balance: env::attached_deposit(),
             completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
                 account_id: account_id.clone(),
             }),

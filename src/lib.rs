@@ -20,6 +20,7 @@ pub use crate::views::*;
 pub use crate::requester_action::*;
 pub use crate::account::*;
 pub use crate::worker_action::*;
+pub use crate::task::*;
 pub use crate::report::*;
 
 pub use crate::storage::*;
@@ -35,6 +36,7 @@ mod views;
 mod requester_action;
 mod account;
 mod worker_action;
+mod task;
 mod report;
 
 mod utils;
@@ -53,7 +55,9 @@ pub struct Dwork {
     pub app_config: AppConfig,
 
     pub task_recores: UnorderedMap<TaskId, Task>,
+    pub proposals: LookupMap<ProposalId, Proposal>,
     pub reports: UnorderedMap<ReportId, Report>,
+    
     pub categories: UnorderedMap<CategoryId, Category>,
 }
 
@@ -73,7 +77,9 @@ impl Dwork {
             app_config: AppConfig::default(),
             
             task_recores: UnorderedMap::new(StorageKey::TaskRecores),
+            proposals: LookupMap::new(StorageKey::Proposals),
             reports: UnorderedMap::new(StorageKey::Reports),
+            
             categories: UnorderedMap::new(StorageKey::Categories),
         }
     }

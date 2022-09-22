@@ -4,6 +4,7 @@ use crate::*;
 pub(crate) enum StorageKey {
     StorageAccount,
     TaskRecores,
+    Proposals,
     Reports,
     Users,
     Categories,
