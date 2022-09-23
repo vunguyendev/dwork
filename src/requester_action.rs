@@ -63,9 +63,7 @@ impl Dwork {
             description,
             price: price.into(),
             max_participants,
-            proposals: UnorderedMap::new(StorageKey::ProposalsPerTask {
-                task_id: task_id.clone(),
-            }),
+            proposals: Vec::new(), 
             approved: Vec::with_capacity(max_participants.into()),
             created_at: env::block_timestamp(),
             submit_available_until: env::block_timestamp() + unwrap_duration,
@@ -97,7 +95,7 @@ impl Dwork {
                 && task
                     .proposals
                     .iter()
-                    .filter(|(_k, v)| v.status == ProposalStatus::Pending)
+                    .filter(|v| self.proposals.get(v).expect("Proposal not found").status == ProposalStatus::Pending)
                     .count()
                     > 0;
         }
@@ -120,7 +118,9 @@ impl Dwork {
             "Only owner can approve proposal"
         );
 
-        let mut proposal = task
+        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
+        assert!(task.proposals.contains(&proposal_id), "Invalid proposal_id");
+        let mut proposal = self
             .proposals
             .get(&worker_id)
             .expect("Proposal doesn't found");
@@ -134,7 +134,7 @@ impl Dwork {
 
         proposal.status = ProposalStatus::Approved;
 
-        task.proposals.insert(&worker_id, &proposal);
+        self.proposals.insert(&worker_id, &proposal);
         task.approved.push(worker_id.clone());
 
         self.task_recores.insert(&task_id, &task);
@@ -159,7 +159,7 @@ impl Dwork {
 
     //TODO: add reason by owner CHECKED
     pub fn reject_work(&mut self, task_id: TaskId, worker_id: AccountId, reason: String) {
-        let mut task = self.task_recores.get(&task_id).expect("Job not exist");
+        let task = self.task_recores.get(&task_id).expect("Job not exist");
 
         let beneficiary_id = env::predecessor_account_id();
         assert!(
@@ -169,7 +169,7 @@ impl Dwork {
 
         let storage_update = self.new_storage_update(beneficiary_id);
 
-        let mut proposal = task.proposals.get(&worker_id).expect("Not found proposal");
+        let mut proposal = self.proposals.get(&worker_id).expect("Not found proposal");
         assert!(
             proposal.status != ProposalStatus::Pending,
             "You already approved or rejected this worker!!"
@@ -177,7 +177,7 @@ impl Dwork {
 
         proposal.status = ProposalStatus::Rejected { reason };
 
-        task.proposals.insert(&worker_id, &proposal);
+        self.proposals.insert(&worker_id, &proposal);
         self.task_recores.insert(&task_id, &task);
 
         if self.check_available_review_proposal(task_id.clone()) {

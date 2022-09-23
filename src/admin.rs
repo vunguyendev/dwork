@@ -1,5 +1,4 @@
 use core::fmt;
-use std::future::Pending;
 
 use crate::*;
 
@@ -34,7 +33,7 @@ pub struct AppConfig {
     pub maximum_title_length: u16,
 
     pub claim_point_bonus: u32, // may be a near bonus was given by requester to pay for who call
-                              // first claim / complete task
+                                // first claim / complete task
 }
 
 impl Default for AppConfig {
@@ -148,24 +147,22 @@ impl Dwork {
             report.status == ReportStatus::Pending,
             "Cann't approved this report"
         );
-        report.status = ReportStatus::Approved;
 
+        let mut task = self.internal_get_task(report.task_id.clone());
+        let proposal_id = self.internal_gen_proposal_id(report.task_id.clone(), report.account_id.clone());
+        assert!(task.proposals.contains(&proposal_id), "Invalid proposal id");
+
+        report.status = ReportStatus::Approved;
         self.reports.insert(&report_id, &report);
 
-        let mut task = self
-            .task_recores
-            .get(&report.task_id)
-            .expect("Task not found");
-
-        let mut proposal = task
+        let mut proposal = self
             .proposals
-            .get(&report.account_id)
+            .get(&proposal_id)
             .expect("Proposal not found");
         proposal.status = ProposalStatus::Approved;
-
-        task.proposals.insert(&report.account_id, &proposal);
+        self.proposals.insert(&proposal_id, &proposal);
+        
         task.approved.push(report.account_id.clone());
-
         self.task_recores.insert(&report.task_id, &task);
     }
 
@@ -173,10 +170,25 @@ impl Dwork {
         let mut report = self.reports.get(&report_id).expect("Report not found");
         assert!(
             report.status == ReportStatus::Pending,
-            "Cann't approved this report"
+            "Cann't reject this report"
         );
+        
+        let mut task = self.internal_get_task(report.task_id.clone());
+        let proposal_id = self.internal_gen_proposal_id(report.task_id.clone(), report.account_id.clone());
+        assert!(task.proposals.contains(&proposal_id), "Invalid proposal id");
+
         report.status = ReportStatus::Rejected;
         self.reports.insert(&report_id, &report);
+
+        let mut proposal = self
+            .proposals
+            .get(&proposal_id)
+            .expect("Proposal not found");
+        proposal.status = ProposalStatus::Rejected { reason: "Completed".to_string() };
+        self.proposals.insert(&proposal_id, &proposal);
+        
+        task.approved.push(report.account_id.clone());
+        self.task_recores.insert(&report.task_id, &task);
     }
 
     // //NOTE: Migrate function
@@ -213,12 +225,15 @@ impl Dwork {
                 return task
                     .proposals
                     .iter()
-                    .filter(|(_k, v)| match &v.status {
-                        ProposalStatus::Reported { report_id } => {
-                            let report = self.reports.get(report_id).expect("Report not found");
-                            report.status == ReportStatus::Pending
+                    .filter(|v| {
+                        let proposal = self.proposals.get(v).expect("Proposal not found");
+                        match proposal.status {
+                            ProposalStatus::Reported { report_id } => {
+                                let report = self.reports.get(&report_id).expect("Report not found");
+                                report.status == ReportStatus::Pending
+                            }
+                            _ => false,
                         }
-                        _ => false,
                     })
                     .count()
                     > 0;
@@ -228,49 +243,48 @@ impl Dwork {
     }
 
     pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
-        let task = self.task_recores.get(&task_id).expect("Task not found");
-
-        let beneficiary_id = env::predecessor_account_id();
-        assert!(
-            task.owner == beneficiary_id,
-            "Only owner can reject proposal"
-        );
-
-        assert!(
-            task.proposals
-                .iter()
-                .filter(|(_k, v)| v.status == ProposalStatus::Pending)
-                .count()
-                == 0
-                || task.approved.len() == task.max_participants as usize,
-            "Some work remains unchecked"
-        );
-
-        let completed_proposals_count = task
-            .proposals
-            .iter()
-            .filter(|(_k, v)| v.status == ProposalStatus::Approved)
-            .count();
-
-        let refund: u64 = (task.max_participants as u64) - task.proposals.len();
-
-        let amount_to_transfer = (task.price as u128)
-            .checked_mul(refund.into())
-            .expect("Can not calculate amount to refund");
-        if completed_proposals_count < task.max_participants as usize {
-            assert!(
-                task.submit_available_until < env::block_timestamp(),
-                "This request is not expire, you can not mark it completed!"
-            );
-
-            Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
-        }
-
-        let mut owner = self.accounts.get(&beneficiary_id).expect("Not found owner");
-        owner.completed_jobs.insert(&task_id);
-        owner.current_jobs.remove(&task_id);
-        owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
-        self.accounts.insert(&beneficiary_id, &owner);
+        // let task = self.task_recores.get(&task_id).expect("Task not found");
+        //
+        // let beneficiary_id = env::predecessor_account_id();
+        // assert!(
+        //     task.owner == beneficiary_id,
+        //     "Only owner can reject proposal"
+        // );
+        //
+        // assert!(
+        //     task.proposals
+        //         .iter()
+        //         .filter(|(_k, v)| v.status == ProposalStatus::Pending)
+        //         .count()
+        //         == 0
+        //         || task.approved.len() == task.max_participants as usize,
+        //     "Some work remains unchecked"
+        // );
+        //
+        // let completed_proposals_count = task
+        //     .proposals
+        //     .iter()
+        //     .filter(|(_k, v)| v.status == ProposalStatus::Approved)
+        //     .count();
+        //
+        // let refund: u64 = (task.max_participants as u64) - task.proposals.len();
+        //
+        // let amount_to_transfer = (task.price as u128)
+        //     .checked_mul(refund.into())
+        //     .expect("Can not calculate amount to refund");
+        // if completed_proposals_count < task.max_participants as usize {
+        //     assert!(
+        //         task.submit_available_until < env::block_timestamp(),
+        //         "This request is not expire, you can not mark it completed!"
+        //     );
+        //
+        //     Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
+        // }
+        //
+        // let mut owner = self.accounts.get(&beneficiary_id).expect("Not found owner");
+        // owner.completed_jobs.insert(&task_id);
+        // owner.current_jobs.remove(&task_id);
+        // owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
+        // self.accounts.insert(&beneficiary_id, &owner);
     }
-
 }

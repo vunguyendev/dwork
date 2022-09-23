@@ -14,12 +14,13 @@ pub struct WrappedTask {
     pub category_id: CategoryId,
 }
 
-impl From<Task> for WrappedTask {
-    fn from(task: Task) -> Self {
+// impl From<Task> for WrappedTask {
+impl Dwork {
+    pub fn json_from_task(&self, task: Task) -> WrappedTask {
         let proposals: Vec<Proposal> = task
             .proposals
             .iter()
-            .map(|(_k, item)| item)
+            .map(|item| self.proposals.get(item).expect("Proposal not found"))
             .collect();
 
         WrappedTask {

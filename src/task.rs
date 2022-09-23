@@ -38,4 +38,15 @@ impl Dwork {
     pub(crate) fn internal_get_task(&self, task_id: TaskId) -> Task {
         self.task_recores.get(&task_id).expect("Task not found")
     }
+
+    pub(crate) fn internal_gen_proposal_id(&self, task_id: TaskId, worker_id: AccountId) -> String {
+        task_id + "_" + &worker_id
+    }
+
+    pub(crate) fn internal_get_proposal(&self, task_id: TaskId, worker_id: AccountId) -> Proposal {
+        let task = self.internal_get_task(task_id.clone());
+        let proposal_id = self.internal_gen_proposal_id(task_id, worker_id);
+        assert!(task.proposals.contains(&proposal_id), "Invalid proposal id");
+        self.proposals.get(&proposal_id).expect("Proposal not found")
+    }
 }

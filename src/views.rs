@@ -21,7 +21,7 @@ impl Dwork {
             .map(|index| {
                 let task_id = tasks_id.get(index as u64).unwrap();
                 let task = self.task_recores.get(&task_id).unwrap();
-                (task_id, WrappedTask::from(task))
+                (task_id, self.json_from_task(task))
             })
             .rev()
             .collect()
@@ -57,7 +57,7 @@ impl Dwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    WrappedTask::from(self.task_recores.get(key).unwrap()),
+                    self.json_from_task(self.internal_get_task(key.to_string())),
                 )
             })
             .rev()
@@ -94,7 +94,7 @@ impl Dwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    WrappedTask::from(self.task_recores.get(key).unwrap()),
+                    self.json_from_task(self.internal_get_task(key.to_string())),
                 )
             })
             .rev()
@@ -104,7 +104,7 @@ impl Dwork {
     pub fn task_by_id(&self, task_id: TaskId) -> WrappedTask {
         self.task_recores
             .get(&task_id)
-            .map(WrappedTask::from)
+            .map(|task| self.json_from_task(task))
             .expect("Task not found")
     }
 
