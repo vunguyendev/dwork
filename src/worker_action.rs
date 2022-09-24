@@ -28,12 +28,12 @@ impl Dwork {
             "Full approved participants"
         );
 
-        //TODO increase worker current task
+        // Increase worker current task
         let worker_id = env::predecessor_account_id();
         let mut worker = self.internal_get_account(&worker_id);
         worker.current_jobs.insert(&task_id);
         self.internal_set_account(&worker_id, worker);
-        
+
         let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
         let proposal = Proposal {
             account_id: worker_id,
@@ -43,35 +43,31 @@ impl Dwork {
         };
 
         self.proposals.insert(&proposal_id, &proposal);
-        
+
         task.proposals.push(proposal_id);
         self.task_recores.insert(&task_id, &task);
     }
 
     #[payable]
     pub fn report_rejection(&mut self, task_id: String, report: String) {
-        let task = self.internal_get_task(&task_id);
-        assert!(
-            task.review_proposal_complete_at.is_none()
-                || task.review_proposal_complete_at.unwrap() + self.app_config.report_interval
-                    > env::block_timestamp(),
-            "Time for report is expired"
-        );
-
         let worker_id = env::predecessor_account_id();
-        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
-
-        assert!(
-            task.proposals.contains(&proposal_id),
-            "You didn't submit proposal to task {}",
-            task_id
-        );
-
-        let mut proposal = self.proposals.get(&proposal_id).expect("Proposal not found");
+        let (proposal_id, mut proposal) =
+            self.internal_get_proposal(task_id.clone(), worker_id.clone());
 
         match proposal.status {
-            ProposalStatus::Rejected { reason } => {
+            ProposalStatus::Rejected {
+                reason,
+                reject_at,
+                report_id,
+            } => {
                 assert!(reason != "late", "Cannot report this reject reason");
+                assert!(report_id.is_none(), "Reported this rejection");
+                assert!(
+                    reject_at + self.app_config.report_interval < env::block_timestamp(),
+                    "Not available to report this rejection"
+                );
+
+                // Update reports
                 let report_id = worker_id.clone() + "_" + &task_id;
                 let report = Report {
                     report_id: report_id.clone(),
@@ -82,7 +78,13 @@ impl Dwork {
                 };
 
                 self.reports.insert(&report_id, &report);
-                proposal.status = ProposalStatus::Reported { report_id };
+                
+                // Update proposal
+                proposal.status = ProposalStatus::Rejected {
+                    reason,
+                    reject_at,
+                    report_id: Some(report_id),
+                };
                 self.proposals.insert(&proposal_id, &proposal);
             }
             ProposalStatus::Approved => panic!("Proposal have been approved"),
@@ -90,35 +92,36 @@ impl Dwork {
         }
     }
 
-    pub fn claim(&mut self, task_id: TaskId) {
-        let mut task = self.task_recores.get(&task_id).expect("Task not found");
-        let mut caller = self.internal_get_account(&env::predecessor_account_id());
-
-        assert!(
-            !self.check_available_review_report(task_id.clone()),
-            "Task still in process"
-        );
-
-        if task.approved.len() > task.max_participants as usize {
-            let mut approvals: Vec<Proposal> = task
-                .approved
-                .clone()
-                .iter()
-                .map(|v| self.proposals.get(v).expect("Proposal not found")).collect();
-            approvals.sort_by(|a, b| a.submit_time.partial_cmp(&b.submit_time).unwrap());
-            let valid_approvals = &approvals[..task.max_participants as usize];
-            let final_approve: Vec<AccountId> = valid_approvals
-                .iter()
-                .map(|v| v.account_id.clone())
-                .collect();
-            task.approved = final_approve;
-            self.task_recores.insert(&task_id, &task);
-
-            caller.pos_point += self.app_config.claim_point_bonus;
-            self.internal_set_account(&env::predecessor_account_id(), caller);
-        }
-        let mut worker = self.internal_get_account(&env::predecessor_account_id());
-        let amount = task.price;
-        worker.balance += amount + self.app_config.submit_bond;
-    }
+//     pub fn claim(&mut self, task_id: TaskId) {
+//         let mut task = self.task_recores.get(&task_id).expect("Task not found");
+//         let mut caller = self.internal_get_account(&env::predecessor_account_id());
+//
+//         // assert!(
+//         //     !self.check_available_review_report(task_id.clone()),
+//         //     "Task still in process"
+//         // );
+//
+//         if task.approved.len() > task.max_participants as usize {
+//             let mut approvals: Vec<Proposal> = task
+//                 .approved
+//                 .clone()
+//                 .iter()
+//                 .map(|v| self.proposals.get(v).expect("Proposal not found"))
+//                 .collect();
+//             approvals.sort_by(|a, b| a.submit_time.partial_cmp(&b.submit_time).unwrap());
+//             let valid_approvals = &approvals[..task.max_participants as usize];
+//             let final_approve: Vec<AccountId> = valid_approvals
+//                 .iter()
+//                 .map(|v| v.account_id.clone())
+//                 .collect();
+//             task.approved = final_approve;
+//             self.task_recores.insert(&task_id, &task);
+//
+//             caller.pos_point += self.app_config.claim_point_bonus;
+//             self.internal_set_account(&env::predecessor_account_id(), caller);
+//         }
+//         let mut worker = self.internal_get_account(&env::predecessor_account_id());
+//         let amount = task.price;
+//         worker.balance += amount + self.app_config.submit_bond;
+//     }
 }

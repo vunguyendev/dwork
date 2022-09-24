@@ -18,15 +18,9 @@ pub struct Task {
     pub max_participants: u16,
     pub price: Balance,
     pub proposals: Vec<ProposalId>,
-    pub approved: Vec<ProposalId>, // Proposal id is account_id of worker
     pub created_at: Timestamp,
-
-    // As default: after deadline (submit_available_until), owner have 1 month to review all submition and marks task as
-    // complete if done soon. from that time (review_proposal_complete_at) all worker have 2 days more to review and submit the
-    // report
+    pub last_rejection_published_at: Option<Timestamp>,
     pub submit_available_until: Timestamp,
-    pub review_proposal_complete_at: Option<Timestamp>,
-
     pub category_id: CategoryId,
 }
 

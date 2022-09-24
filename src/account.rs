@@ -45,37 +45,6 @@ impl Dwork {
             .expect("Canot map user to json")
     }
 
-    // #[payable]
-    // pub fn register(&mut self) {
-    //     assert!(
-    //         env::attached_deposit() == self.app_config.register_bond,
-    //         "Send exactly {:?} Near to register",
-    //         self.app_config.register_bond
-    //     );
-    //
-    //     let account_id = env::predecessor_account_id();
-    //
-    //     assert!(self.accounts.get(&account_id).is_none(), "Account already exist!");
-    //
-    //     let user = Account {
-    //         account_id: account_id.clone(),
-    //         bio: "A member of dWork".to_string(),
-    //         total_earn: 0,
-    //         total_spent: 0,
-    //         locked_balance: env::attached_deposit(),
-    //         completed_jobs: UnorderedSet::new(StorageKey::UserCompletedTasks {
-    //             account_id: account_id.clone(),
-    //         }),
-    //         current_jobs: UnorderedSet::new(StorageKey::UserCurrentTasks {
-    //             account_id: account_id.clone(),
-    //         }),
-    //         pos_point: 0,
-    //         neg_point: 0,
-    //     };
-    //
-    //     self.accounts.insert(&account_id, &user);
-    // }
-
     pub(crate) fn internal_create_account(&mut self, account_id: &AccountId) -> Account {
         let account = Account {
             account_id: account_id.clone(),
@@ -118,7 +87,6 @@ impl Dwork {
         self.accounts.insert(account_id, &account);
     }
 
-    //Account logic
     pub fn update_bio(&mut self, bio: String) {
         let account_id = env::predecessor_account_id();
         let mut account = self.internal_get_account(&account_id);

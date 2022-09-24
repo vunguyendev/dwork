@@ -4,8 +4,8 @@ use near_sdk::json_types::{WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::{json, Value};
 use near_sdk::{
-    env, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
-    Gas, PanicOnDefault, Promise, Timestamp, StorageUsage,
+    env, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration, Gas,
+    PanicOnDefault, Promise, StorageUsage, Timestamp,
 };
 
 pub const DEFAULT_GAS_TO_PAY: Gas = 20_000_000_000_000;
@@ -14,14 +14,15 @@ pub use crate::admin::*;
 pub use crate::categories::*;
 pub use crate::ext::*;
 pub use crate::json_types::*;
-pub use crate::types::*;
 pub use crate::views::*;
 
-pub use crate::requester_action::*;
 pub use crate::account::*;
-pub use crate::worker_action::*;
-pub use crate::task::*;
+pub use crate::proposal::*;
 pub use crate::report::*;
+pub use crate::task::*;
+
+pub use crate::requester_action::*;
+pub use crate::worker_action::*;
 
 pub use crate::storage::*;
 pub use crate::utils::*;
@@ -30,17 +31,17 @@ mod admin;
 mod categories;
 mod ext;
 mod json_types;
-mod types;
+mod proposal;
 mod views;
 
-mod requester_action;
 mod account;
-mod worker_action;
-mod task;
 mod report;
+mod requester_action;
+mod task;
+mod worker_action;
 
-mod utils;
 mod storage;
+mod utils;
 
 setup_alloc!();
 
@@ -49,7 +50,7 @@ setup_alloc!();
 pub struct Dwork {
     pub storage_accounts: LookupMap<AccountId, StorageAccount>,
     pub accounts: LookupMap<AccountId, Account>,
-    
+
     pub admins: LookupSet<AccountId>,
     pub storage_account_in_bytes: StorageUsage,
     pub app_config: AppConfig,
@@ -57,7 +58,7 @@ pub struct Dwork {
     pub task_recores: UnorderedMap<TaskId, Task>,
     pub proposals: LookupMap<ProposalId, Proposal>,
     pub reports: UnorderedMap<ReportId, Report>,
-    
+
     pub categories: UnorderedMap<CategoryId, Category>,
 }
 
@@ -71,15 +72,15 @@ impl Dwork {
         Self {
             storage_accounts: LookupMap::new(StorageKey::StorageAccount),
             accounts: LookupMap::new(StorageKey::Users),
-            
+
             admins: LookupSet::new(StorageKey::Admins),
             storage_account_in_bytes: 0,
             app_config: AppConfig::default(),
-            
+
             task_recores: UnorderedMap::new(StorageKey::TaskRecores),
             proposals: LookupMap::new(StorageKey::Proposals),
             reports: UnorderedMap::new(StorageKey::Reports),
-            
+
             categories: UnorderedMap::new(StorageKey::Categories),
         }
     }

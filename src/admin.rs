@@ -23,7 +23,10 @@ pub struct AppConfig {
     pub running_state: RunningState,
     pub register_bond: Balance,
     pub submit_bond: Balance,
+
     pub report_interval: Timestamp,
+    pub validate_report_interval: Timestamp,
+
     pub minimum_reward_per_task: Balance,
     pub maximum_reward_per_task: Balance,
     pub maximum_description_length: u16,
@@ -43,6 +46,7 @@ impl Default for AppConfig {
             register_bond: 500_000_000_000_000_000_000_000,
             submit_bond: 10_000_000_000_000_000_000_000,
             report_interval: 172_800_000_000_000, // 2 days
+            validate_report_interval: 259_200_000_000_000, // 3 days
             minimum_reward_per_task: 10_000_000_000_000_000_000_000,
             maximum_reward_per_task: 100_000_000_000_000_000_000_000_000,
             maximum_description_length: 10000,
@@ -145,21 +149,78 @@ impl Dwork {
         let mut report = self.reports.get(&report_id).expect("Report not found");
         assert!(
             report.status == ReportStatus::Pending,
-            "Cann't approved this report"
+            "Can't approved this report"
         );
 
-        let mut task = self.internal_get_task(&report.task_id);
+        let task = self.internal_get_task(&report.task_id);
         let (proposal_id, mut proposal) =
             self.internal_get_proposal(report.task_id.clone(), report.account_id.clone());
 
+        match proposal.status {
+            ProposalStatus::Rejected {
+                reason: _,
+                reject_at: _,
+                report_id,
+            } => {
+                assert!(report_id.is_none(), "Invalid report");
+            }
+            _ => panic!("Invalid report"),
+        }
+
+        // Update Report status
         report.status = ReportStatus::Approved;
         self.reports.insert(&report_id, &report);
 
+        // Update Proposal Status
         proposal.status = ProposalStatus::Approved;
         self.proposals.insert(&proposal_id, &proposal);
 
-        task.approved.push(report.account_id.clone());
-        self.task_recores.insert(&report.task_id, &task);
+        /* Update Worker Locked balance
+         * - Add Locked Balance for this worker
+         * - Remove Locked Balance from last worker (if needed)
+         */
+        // Add locked balance for woker
+        let mut worker = self.internal_get_account(&report.account_id);
+        let release_at: Timestamp = match task.last_rejection_published_at {
+            Some(time) => {
+                time + self.app_config.report_interval + self.app_config.validate_report_interval
+            }
+            None => env::block_timestamp(),
+        };
+        let new_locked_balance = LockedBalance {
+            amount: task.price,
+            release_at,
+            // Must be the last rejection deadline report + 3 days
+        };
+        worker.locked_balance.insert(&report.task_id, &new_locked_balance);
+        self.internal_set_account(&report.account_id, worker);
+        
+        let mut num_approvals = 0;
+        for proposal_id in task.proposals.iter() {
+            let mut proposal = self
+                .proposals
+                .get(proposal_id)
+                .expect("Proposal not found");
+
+            match proposal.status {
+                ProposalStatus::Approved => {
+                    if num_approvals >= task.max_participants {
+                        proposal.status = ProposalStatus::Rejected {
+                            reason: "late".to_string(),
+                            reject_at: env::block_timestamp(),
+                            report_id: None,
+                        };
+                        // Remove locked balance
+                        let mut worker = self.internal_get_account(&proposal.account_id);
+                        worker.locked_balance.remove(&report.task_id);
+                    } else {
+                        num_approvals += 1;
+                    }
+                }
+                ProposalStatus::Pending => break,
+                _ => {}
+            }
+        }
     }
 
     pub fn reject_report(&mut self, report_id: ReportId) {
@@ -169,74 +230,28 @@ impl Dwork {
             "Cann't reject this report"
         );
 
-        let mut task = self.internal_get_task(&report.task_id);
         let (proposal_id, mut proposal) =
             self.internal_get_proposal(report.task_id.clone(), report.account_id.clone());
+        
+        match proposal.status {
+            ProposalStatus::Rejected {
+                reason: _,
+                reject_at: _,
+                report_id,
+            } => {
+                assert!(report_id.is_none(), "Invalid report");
+            }
+            _ => panic!("Invalid report"),
+        }
 
         report.status = ReportStatus::Rejected;
         self.reports.insert(&report_id, &report);
 
-        proposal.status = ProposalStatus::Rejected {
-            reason: "Completed".to_string(),
-        };
+        proposal.status = ProposalStatus::RejectedByAdmin;
         self.proposals.insert(&proposal_id, &proposal);
-
-        task.approved.push(report.account_id.clone());
-        self.task_recores.insert(&report.task_id, &task);
     }
-
-    // //NOTE: Migrate function
-    // #[private]
-    // #[init(ignore_state)]
-    // pub fn migrate(&self) -> Self {
-    //     assert!(self.is_admin(env::predecessor_account_id()), "You don't have permission to migrate this contract!");
-    //     let old_state: OldContract = env::state_read().expect("failed");
-    //     Self {
-    //         storage_accounts: old_state.storage_accounts,
-    //         accounts: old_state.accounts,
-    //         posts: old_state.posts,
-    //         user_posts: old_state.user_posts,
-    //         deleted_posts: old_state.deleted_posts,
-    //         messages: old_state.messages,
-    //         likes: old_state.likes,
-    //         comments: old_state.comments,
-    //         topics: old_state.topics,
-    //         topics_posts: old_state.topics_posts,
-    //         communities: old_state.communities,
-    //         communities_posts: old_state.communities_posts,
-    //         members_in_communites: old_state.members_in_communites,
-    //         storage_account_in_bytes: old_state.storage_account_in_bytes,
-    //         admins: LookupSet::new(StorageKey::Admins),
-    //     }
-    // }
-    //
-
-    pub fn check_available_review_report(&self, task_id: TaskId) -> bool {
-        let task = self.task_recores.get(&task_id).expect("Task not found");
-        if let Some(end_review) = task.review_proposal_complete_at {
-            let now = env::block_timestamp();
-            if now > end_review + self.app_config.report_interval {
-                return task
-                    .proposals
-                    .iter()
-                    .filter(|v| {
-                        let proposal = self.proposals.get(v).expect("Proposal not found");
-                        match proposal.status {
-                            ProposalStatus::Reported { report_id } => {
-                                let report =
-                                    self.reports.get(&report_id).expect("Report not found");
-                                report.status == ReportStatus::Pending
-                            }
-                            _ => false,
-                        }
-                    })
-                    .count()
-                    > 0;
-            }
-        }
-        true
-    }
-
+    
+    // TODO
     pub fn mark_task_as_completed(&mut self, _task_id: TaskId) {
         // let task = self.task_recores.get(&task_id).expect("Task not found");
         //
