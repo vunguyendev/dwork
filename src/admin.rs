@@ -148,20 +148,16 @@ impl Dwork {
             "Cann't approved this report"
         );
 
-        let mut task = self.internal_get_task(report.task_id.clone());
-        let proposal_id = self.internal_gen_proposal_id(report.task_id.clone(), report.account_id.clone());
-        assert!(task.proposals.contains(&proposal_id), "Invalid proposal id");
+        let mut task = self.internal_get_task(&report.task_id);
+        let (proposal_id, mut proposal) =
+            self.internal_get_proposal(report.task_id.clone(), report.account_id.clone());
 
         report.status = ReportStatus::Approved;
         self.reports.insert(&report_id, &report);
 
-        let mut proposal = self
-            .proposals
-            .get(&proposal_id)
-            .expect("Proposal not found");
         proposal.status = ProposalStatus::Approved;
         self.proposals.insert(&proposal_id, &proposal);
-        
+
         task.approved.push(report.account_id.clone());
         self.task_recores.insert(&report.task_id, &task);
     }
@@ -172,21 +168,19 @@ impl Dwork {
             report.status == ReportStatus::Pending,
             "Cann't reject this report"
         );
-        
-        let mut task = self.internal_get_task(report.task_id.clone());
-        let proposal_id = self.internal_gen_proposal_id(report.task_id.clone(), report.account_id.clone());
-        assert!(task.proposals.contains(&proposal_id), "Invalid proposal id");
+
+        let mut task = self.internal_get_task(&report.task_id);
+        let (proposal_id, mut proposal) =
+            self.internal_get_proposal(report.task_id.clone(), report.account_id.clone());
 
         report.status = ReportStatus::Rejected;
         self.reports.insert(&report_id, &report);
 
-        let mut proposal = self
-            .proposals
-            .get(&proposal_id)
-            .expect("Proposal not found");
-        proposal.status = ProposalStatus::Rejected { reason: "Completed".to_string() };
+        proposal.status = ProposalStatus::Rejected {
+            reason: "Completed".to_string(),
+        };
         self.proposals.insert(&proposal_id, &proposal);
-        
+
         task.approved.push(report.account_id.clone());
         self.task_recores.insert(&report.task_id, &task);
     }
@@ -229,7 +223,8 @@ impl Dwork {
                         let proposal = self.proposals.get(v).expect("Proposal not found");
                         match proposal.status {
                             ProposalStatus::Reported { report_id } => {
-                                let report = self.reports.get(&report_id).expect("Report not found");
+                                let report =
+                                    self.reports.get(&report_id).expect("Report not found");
                                 report.status == ReportStatus::Pending
                             }
                             _ => false,
@@ -242,7 +237,7 @@ impl Dwork {
         true
     }
 
-    pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
+    pub fn mark_task_as_completed(&mut self, _task_id: TaskId) {
         // let task = self.task_recores.get(&task_id).expect("Task not found");
         //
         // let beneficiary_id = env::predecessor_account_id();

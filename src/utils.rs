@@ -10,7 +10,7 @@ pub(crate) enum StorageKey {
     Categories,
     UserCurrentTasks { account_id: AccountId },
     UserCompletedTasks { account_id: AccountId },
-    ProposalsPerTask { task_id: String },
+    // ProposalsPerTask { task_id: String },
     Admins,
 }
 
@@ -21,3 +21,4 @@ pub fn assert_one_yocto() {
         "Requires attached deposit of exactly 1 yoctoNEAR"
     )
 }
+

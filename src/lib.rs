@@ -4,8 +4,8 @@ use near_sdk::json_types::{WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::{json, Value};
 use near_sdk::{
-    env, ext_contract, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
-    Gas, PanicOnDefault, Promise, PromiseResult, Timestamp, StorageUsage,
+    env, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration,
+    Gas, PanicOnDefault, Promise, Timestamp, StorageUsage,
 };
 
 pub const DEFAULT_GAS_TO_PAY: Gas = 20_000_000_000_000;

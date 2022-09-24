@@ -4,16 +4,17 @@ use crate::*;
 impl Dwork {
     #[payable]
     pub fn submit_work(&mut self, task_id: String, proof: String) {
+        // TODO: Allow user to use current balance
         assert!(
             env::attached_deposit() == self.app_config.submit_bond,
             "Send exactly {:?} Near to submit",
             self.app_config.submit_bond
         );
 
-        let mut task = self.internal_get_task(task_id.clone());
+        let mut task = self.internal_get_task(&task_id);
         let now = env::block_timestamp();
 
-        assert!(task.submit_available_until > now, "This request is expire!");
+        assert!(task.submit_available_until > now, "Request is expired");
 
         assert!(
             task.proposals
@@ -30,27 +31,26 @@ impl Dwork {
         //TODO increase worker current task
         let worker_id = env::predecessor_account_id();
         let mut worker = self.internal_get_account(&worker_id);
-        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
-
         worker.current_jobs.insert(&task_id);
-
+        self.internal_set_account(&worker_id, worker);
+        
+        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
         let proposal = Proposal {
-            account_id: worker_id.clone(),
+            account_id: worker_id,
             submit_time: now,
             proof_of_work: proof,
             status: ProposalStatus::Pending,
         };
 
         self.proposals.insert(&proposal_id, &proposal);
+        
         task.proposals.push(proposal_id);
-
         self.task_recores.insert(&task_id, &task);
-        self.internal_set_account(&worker_id, worker);
     }
 
     #[payable]
     pub fn report_rejection(&mut self, task_id: String, report: String) {
-        let task = self.internal_get_task(task_id.clone());
+        let task = self.internal_get_task(&task_id);
         assert!(
             task.review_proposal_complete_at.is_none()
                 || task.review_proposal_complete_at.unwrap() + self.app_config.report_interval
@@ -75,8 +75,8 @@ impl Dwork {
                 let report_id = worker_id.clone() + "_" + &task_id;
                 let report = Report {
                     report_id: report_id.clone(),
-                    account_id: worker_id.clone(),
-                    task_id: task_id.clone(),
+                    account_id: worker_id,
+                    task_id,
                     report,
                     status: ReportStatus::Pending,
                 };

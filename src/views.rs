@@ -57,7 +57,7 @@ impl Dwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    self.json_from_task(self.internal_get_task(key.to_string())),
+                    self.json_from_task(self.internal_get_task(key)),
                 )
             })
             .rev()
@@ -94,7 +94,7 @@ impl Dwork {
                 let key = tasks_id.get(index as usize).unwrap();
                 (
                     key.clone(),
-                    self.json_from_task(self.internal_get_task(key.to_string())),
+                    self.json_from_task(self.internal_get_task(key)),
                 )
             })
             .rev()

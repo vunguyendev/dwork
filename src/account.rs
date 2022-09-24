@@ -84,7 +84,7 @@ impl Dwork {
         };
         
         assert!(
-            self.accounts.get(&account_id).is_none(),
+            self.accounts.get(account_id).is_none(),
             "Account already exists"
         );
         
@@ -93,7 +93,7 @@ impl Dwork {
     }
 
     pub(crate) fn internal_get_account_optional(&self, account_id: &AccountId) -> Option<Account> {
-        self.accounts.get(account_id).map(|a| a.into())
+        self.accounts.get(account_id)
     }
 
     pub(crate) fn internal_get_account(&self, account_id: &AccountId) -> Account {
@@ -102,7 +102,7 @@ impl Dwork {
     }
 
     pub(crate) fn internal_set_account(&mut self, account_id: &AccountId, account: Account) {
-        self.accounts.insert(account_id, &account.into());
+        self.accounts.insert(account_id, &account);
     }
 
     //Account logic
@@ -115,17 +115,17 @@ impl Dwork {
 
     #[private]
     pub fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
-        let mut user = self.internal_get_account(&account_id);
-        let cur_point = user.pos_point;
-        user.pos_point = cur_point + point;
-        self.accounts.insert(&account_id, &user);
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.pos_point;
+        account.pos_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
     }
     
     #[private]
     pub fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
-        let mut user = self.internal_get_account(&account_id);
-        let cur_point = user.neg_point;
-        user.neg_point = cur_point + point;
-        self.accounts.insert(&account_id, &user);
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.neg_point;
+        account.neg_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
     }
 }
