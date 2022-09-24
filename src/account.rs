@@ -45,6 +45,65 @@ impl Dwork {
             .expect("Canot map user to json")
     }
 
+    // Modify method
+    pub fn update_bio(&mut self, bio: String) {
+        let account_id = env::predecessor_account_id();
+        let mut account = self.internal_get_account(&account_id);
+        account.bio = bio;
+        self.internal_set_account(&account_id, account);
+    }
+
+    #[payable]
+    pub fn deposit(&mut self, account_id: Option<AccountId>) {
+        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+        let mut account = self.internal_get_account(&account_id);
+
+        assert!(
+            env::attached_deposit() >= self.app_config.minimum_deposit
+                && env::attached_deposit() <= self.app_config.maximum_deposit,
+            "Total amount for each task must be in a range from {} to {}",
+            self.app_config.minimum_deposit,
+            self.app_config.maximum_deposit
+        );
+
+        account.balance += env::attached_deposit();
+        self.internal_set_account(&account_id, account)
+    }
+
+    pub fn withdraw(&mut self, account_id: Option<AccountId>, amount: Balance) {
+        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+        let mut account = self.internal_get_account(&account_id);
+
+        assert!(account.balance >= amount, "Your account doesn't have enough money");
+
+        assert!(
+            amount >= self.app_config.minimum_deposit
+                && amount <= self.app_config.maximum_deposit,
+            "Amount for each withdraws must be in a range from {} to {}",
+            self.app_config.minimum_deposit,
+            self.app_config.maximum_deposit
+        );
+
+        // TODO: Transfer to user before set 
+        account.balance -= amount;
+        self.internal_set_account(&account_id, account)
+    }
+
+    #[private]
+    pub fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.pos_point;
+        account.pos_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
+    }
+
+    #[private]
+    pub fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.neg_point;
+        account.neg_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
+    }
     pub(crate) fn internal_create_account(&mut self, account_id: &AccountId) -> Account {
         let account = Account {
             account_id: account_id.clone(),
@@ -85,28 +144,5 @@ impl Dwork {
 
     pub(crate) fn internal_set_account(&mut self, account_id: &AccountId, account: Account) {
         self.accounts.insert(account_id, &account);
-    }
-
-    pub fn update_bio(&mut self, bio: String) {
-        let account_id = env::predecessor_account_id();
-        let mut account = self.internal_get_account(&account_id);
-        account.bio = bio;
-        self.internal_set_account(&account_id, account);
-    }
-
-    #[private]
-    pub fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.pos_point;
-        account.pos_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
-    }
-
-    #[private]
-    pub fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.neg_point;
-        account.neg_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
     }
 }

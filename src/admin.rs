@@ -34,6 +34,9 @@ pub struct AppConfig {
     pub maximum_proposals_at_one_time: u16,
     pub maximum_requests_active_per_user: u16,
     pub maximum_title_length: u16,
+    
+    pub minimum_deposit: Balance,
+    pub maximum_deposit: Balance,
 
     pub claim_point_bonus: u32, // may be a near bonus was given by requester to pay for who call
                                 // first claim / complete task
@@ -54,6 +57,9 @@ impl Default for AppConfig {
             maximum_proposals_at_one_time: 200,
             maximum_requests_active_per_user: 10,
             maximum_title_length: 100,
+
+            minimum_deposit: 100_000_000_000_000_000_000_000, // 0.1 N
+            maximum_deposit: 500_000_000_000_000_000_000_000_000, // 500 N
 
             claim_point_bonus: 10,
         }
@@ -249,52 +255,5 @@ impl Dwork {
 
         proposal.status = ProposalStatus::RejectedByAdmin;
         self.proposals.insert(&proposal_id, &proposal);
-    }
-    
-    // TODO
-    pub fn mark_task_as_completed(&mut self, _task_id: TaskId) {
-        // let task = self.task_recores.get(&task_id).expect("Task not found");
-        //
-        // let beneficiary_id = env::predecessor_account_id();
-        // assert!(
-        //     task.owner == beneficiary_id,
-        //     "Only owner can reject proposal"
-        // );
-        //
-        // assert!(
-        //     task.proposals
-        //         .iter()
-        //         .filter(|(_k, v)| v.status == ProposalStatus::Pending)
-        //         .count()
-        //         == 0
-        //         || task.approved.len() == task.max_participants as usize,
-        //     "Some work remains unchecked"
-        // );
-        //
-        // let completed_proposals_count = task
-        //     .proposals
-        //     .iter()
-        //     .filter(|(_k, v)| v.status == ProposalStatus::Approved)
-        //     .count();
-        //
-        // let refund: u64 = (task.max_participants as u64) - task.proposals.len();
-        //
-        // let amount_to_transfer = (task.price as u128)
-        //     .checked_mul(refund.into())
-        //     .expect("Can not calculate amount to refund");
-        // if completed_proposals_count < task.max_participants as usize {
-        //     assert!(
-        //         task.submit_available_until < env::block_timestamp(),
-        //         "This request is not expire, you can not mark it completed!"
-        //     );
-        //
-        //     Promise::new(beneficiary_id.to_string()).transfer(amount_to_transfer);
-        // }
-        //
-        // let mut owner = self.accounts.get(&beneficiary_id).expect("Not found owner");
-        // owner.completed_jobs.insert(&task_id);
-        // owner.current_jobs.remove(&task_id);
-        // owner.total_spent += task.price * task.max_participants as u128 - amount_to_transfer;
-        // self.accounts.insert(&beneficiary_id, &owner);
     }
 }

@@ -2,14 +2,6 @@ use crate::*;
 
 pub type TaskId = String;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub enum TaskStatus {
-    SubmitAndReview,
-    ReportAndReviewReport,
-    Complete,
-}
-
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Task {
     pub owner: AccountId,

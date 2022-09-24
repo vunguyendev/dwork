@@ -182,4 +182,63 @@ impl Dwork {
 
         self.finalize_storage_update(storage_update);
     }
+
+    pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
+        let task = self.internal_get_task(&task_id);
+        let mut owner = self.internal_get_account(&task.owner);
+
+        assert!(
+            task.last_rejection_published_at.is_none()
+                || task.last_rejection_published_at.unwrap()
+                    + self.app_config.report_interval
+                    + self.app_config.validate_report_interval
+                    < env::block_timestamp(),
+            "Task still in progress"
+        );
+        assert!(
+            task.proposals
+                .iter()
+                .filter(|proposal_id| {
+                    match self
+                        .proposals
+                        .get(proposal_id)
+                        .expect("Proposal not found")
+                        .status
+                    {
+                        ProposalStatus::Rejected {
+                            reason: _,
+                            reject_at: _,
+                            report_id,
+                        } => report_id.is_some(),
+                        _ => false,
+                    }
+                })
+                .count()
+                == 0,
+            "Task still in progress"
+        );
+
+        let refund: u64 = (task.max_participants as u64)
+            - task
+                .proposals
+                .iter()
+                .filter(|proposal_id| {
+                    self.proposals
+                        .get(proposal_id)
+                        .expect("Proposal not found")
+                        .status
+                        == ProposalStatus::Approved
+                })
+                .count() as u64;
+
+        let remainder = (task.price as u128)
+            .checked_mul(refund.into())
+            .expect("Can not calculate amount to refund");
+
+        owner.balance += remainder;
+        owner.completed_jobs.insert(&task_id);
+        owner.current_jobs.remove(&task_id);
+        owner.total_spent += task.price * task.max_participants as u128 - remainder;
+        self.internal_set_account(&task.owner, owner);
+    }
 }

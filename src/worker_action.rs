@@ -92,36 +92,18 @@ impl Dwork {
         }
     }
 
-//     pub fn claim(&mut self, task_id: TaskId) {
-//         let mut task = self.task_recores.get(&task_id).expect("Task not found");
-//         let mut caller = self.internal_get_account(&env::predecessor_account_id());
-//
-//         // assert!(
-//         //     !self.check_available_review_report(task_id.clone()),
-//         //     "Task still in process"
-//         // );
-//
-//         if task.approved.len() > task.max_participants as usize {
-//             let mut approvals: Vec<Proposal> = task
-//                 .approved
-//                 .clone()
-//                 .iter()
-//                 .map(|v| self.proposals.get(v).expect("Proposal not found"))
-//                 .collect();
-//             approvals.sort_by(|a, b| a.submit_time.partial_cmp(&b.submit_time).unwrap());
-//             let valid_approvals = &approvals[..task.max_participants as usize];
-//             let final_approve: Vec<AccountId> = valid_approvals
-//                 .iter()
-//                 .map(|v| v.account_id.clone())
-//                 .collect();
-//             task.approved = final_approve;
-//             self.task_recores.insert(&task_id, &task);
-//
-//             caller.pos_point += self.app_config.claim_point_bonus;
-//             self.internal_set_account(&env::predecessor_account_id(), caller);
-//         }
-//         let mut worker = self.internal_get_account(&env::predecessor_account_id());
-//         let amount = task.price;
-//         worker.balance += amount + self.app_config.submit_bond;
-//     }
+    pub fn claim(&mut self, task_id: TaskId) {
+        // let mut task = self.internal_get_task(&task_id);
+        let worker_id = env::predecessor_account_id();
+        let mut worker = self.internal_get_account(&worker_id);
+        let LockedBalance { amount, release_at } = worker.locked_balance.get(&task_id).expect("Locked Balance not found");
+        
+        assert!(release_at < env::block_timestamp(), "This balance still be locked");
+
+        worker.balance += amount;
+        self.internal_set_account(&worker_id, worker);
+
+        // task.budget -= amount;
+        // self.task_recores.insert(&task_id, &task);
+    }
 }
