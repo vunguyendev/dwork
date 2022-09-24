@@ -8,6 +8,7 @@ pub(crate) enum StorageKey {
     Reports,
     Users,
     Categories,
+    UserLockedBalance {account_id: AccountId},
     UserCurrentTasks { account_id: AccountId },
     UserCompletedTasks { account_id: AccountId },
     // ProposalsPerTask { task_id: String },

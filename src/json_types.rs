@@ -45,5 +45,3 @@ impl Dwork {
 //     pub user_type: UserType,
 //     pub completed_jobs: Vec<TaskId>,
 // }
-
-

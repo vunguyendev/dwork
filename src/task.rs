@@ -33,7 +33,7 @@ pub struct Task {
 #[near_bindgen]
 impl Dwork {
     pub(crate) fn internal_get_task(&self, task_id: &TaskId) -> Task {
-        self.task_recores.get(&task_id).expect("Task not found")
+        self.task_recores.get(task_id).expect("Task not found")
     }
 
     pub(crate) fn internal_gen_proposal_id(&self, task_id: TaskId, worker_id: AccountId) -> String {
