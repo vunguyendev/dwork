@@ -13,8 +13,6 @@ pub const DEFAULT_GAS_TO_PAY: Gas = 20_000_000_000_000;
 pub use crate::admin::*;
 pub use crate::categories::*;
 pub use crate::ext::*;
-pub use crate::json_types::*;
-pub use crate::views::*;
 
 pub use crate::account::*;
 pub use crate::proposal::*;
@@ -30,9 +28,7 @@ pub use crate::utils::*;
 mod admin;
 mod categories;
 mod ext;
-mod json_types;
 mod proposal;
-mod views;
 
 mod account;
 mod report;

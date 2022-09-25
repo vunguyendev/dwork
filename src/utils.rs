@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::*;
 
 #[derive(BorshStorageKey, BorshSerialize)]
@@ -23,3 +25,18 @@ pub fn assert_one_yocto() {
     )
 }
 
+pub fn calculate_rev_limit(len: u64, from_index: u64, limit: u64) -> Range<u64> {
+    let from = if len > (limit + from_index) {
+        len - limit - from_index
+    } else {
+        0
+    };
+
+    let to = if len > from_index {
+        len - from_index
+    } else {
+        0
+    };
+
+    from..to
+}

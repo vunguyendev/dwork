@@ -22,13 +22,17 @@ pub struct Report {
 
 #[near_bindgen]
 impl Dwork {
-    pub fn get_all_reports(&self) -> Vec<Report> {
+    pub fn get_reports(&self, from_index: u64, limit: u64) -> Vec<Report> {
         let caller = env::predecessor_account_id();
         assert!(self.is_admin(caller), "Just admin can call this function");
-
-        self.reports
-            .values_as_vector()
-            .iter()
+        let reports = self.reports.keys_as_vector();
+        
+        calculate_rev_limit(reports.len(), from_index, limit)
+            .map(|index| {
+                let key = reports.get(index).unwrap();
+                self.reports.get(&key).unwrap()
+            })
+            .rev()
             .collect()
-    }   
+    }
 }
