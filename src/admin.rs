@@ -40,6 +40,7 @@ pub struct AppConfig {
 
     pub claim_point_bonus: u32, // may be a near bonus was given by requester to pay for who call
                                 // first claim / complete task
+    pub critical_point: u16,
 }
 
 impl Default for AppConfig {
@@ -62,6 +63,7 @@ impl Default for AppConfig {
             maximum_deposit: 500_000_000_000_000_000_000_000_000, // 500 N
 
             claim_point_bonus: 10,
+            critical_point: 85
         }
     }
 }

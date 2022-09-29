@@ -72,38 +72,46 @@ impl Dwork {
 
     pub fn withdraw(&mut self, account_id: Option<AccountId>, amount: Balance) {
         let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
-        let mut account = self.internal_get_account(&account_id);
-
-        assert!(account.balance >= amount, "Your account doesn't have enough money");
+        let account = self.internal_get_account(&account_id);
 
         assert!(
-            amount >= self.app_config.minimum_deposit
-                && amount <= self.app_config.maximum_deposit,
+            account.balance >= amount,
+            "Account doesn't have enough balance"
+        );
+
+        assert!(
+            account.pos_point > 50,
+            "Account must have positive point higher than {}",
+            50
+        );
+
+        if account.neg_point != 0 {
+            let rate = account.pos_point / account.neg_point;
+            assert!(
+                rate > self.app_config.critical_point as u32,
+                "Account must have positive point / negative point higher than {}",
+                self.app_config.critical_point
+            );
+        }
+
+        assert!(
+            amount >= self.app_config.minimum_deposit && amount <= self.app_config.maximum_deposit,
             "Amount for each withdraws must be in a range from {} to {}",
             self.app_config.minimum_deposit,
             self.app_config.maximum_deposit
         );
 
-        // TODO: Transfer to user before set 
-        account.balance -= amount;
-        self.internal_set_account(&account_id, account)
+        Promise::new(account_id.to_string())
+            .transfer(amount)
+            .then(ext_self::on_transferd(
+                account_id,
+                amount,
+                &env::current_account_id(),
+                0,
+                DEFAULT_GAS_TO_PAY,
+            ));
     }
 
-    #[private]
-    pub fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.pos_point;
-        account.pos_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
-    }
-
-    #[private]
-    pub fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.neg_point;
-        account.neg_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
-    }
     pub(crate) fn internal_create_account(&mut self, account_id: &AccountId) -> Account {
         let account = Account {
             account_id: account_id.clone(),
@@ -144,5 +152,19 @@ impl Dwork {
 
     pub(crate) fn internal_set_account(&mut self, account_id: &AccountId, account: Account) {
         self.accounts.insert(account_id, &account);
+    }
+
+    pub(crate) fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.pos_point;
+        account.pos_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
+    }
+
+    pub(crate) fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
+        let mut account = self.internal_get_account(&account_id);
+        let cur_point = account.neg_point;
+        account.neg_point = cur_point + point;
+        self.internal_set_account(&account_id, account);
     }
 }

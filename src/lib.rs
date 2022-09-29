@@ -5,7 +5,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::{json, Value};
 use near_sdk::{
     env, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration, Gas,
-    PanicOnDefault, Promise, StorageUsage, Timestamp,
+    PanicOnDefault, Promise, StorageUsage, Timestamp, ext_contract, PromiseResult
 };
 
 pub const DEFAULT_GAS_TO_PAY: Gas = 20_000_000_000_000;
