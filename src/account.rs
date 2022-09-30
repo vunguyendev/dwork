@@ -15,7 +15,7 @@ pub struct Account {
 
     pub total_spent: Balance,
     pub total_earn: Balance,
-    pub balance: Balance,
+    // pub balance: Balance,
 
     pub locked_balance: UnorderedMap<TaskId, LockedBalance>,
 
@@ -39,7 +39,7 @@ impl Dwork {
                     "current_jobs": v.current_jobs.to_vec(),
                     "total_earn": v.total_earn,
                     "total_spent": v.total_spent,
-                    "balance": v.balance
+                    // "balance": v.balance
                 })
             })
             .expect("Canot map user to json")
@@ -53,64 +53,64 @@ impl Dwork {
         self.internal_set_account(&account_id, account);
     }
 
-    #[payable]
-    pub fn deposit(&mut self, account_id: Option<AccountId>) {
-        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
-        let mut account = self.internal_get_account(&account_id);
-
-        assert!(
-            env::attached_deposit() >= self.app_config.minimum_deposit
-                && env::attached_deposit() <= self.app_config.maximum_deposit,
-            "Total amount for each task must be in a range from {} to {}",
-            self.app_config.minimum_deposit,
-            self.app_config.maximum_deposit
-        );
-
-        account.balance += env::attached_deposit();
-        self.internal_set_account(&account_id, account)
-    }
-
-    pub fn withdraw(&mut self, account_id: Option<AccountId>, amount: Balance) {
-        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
-        let account = self.internal_get_account(&account_id);
-
-        assert!(
-            account.balance >= amount,
-            "Account doesn't have enough balance"
-        );
-
-        assert!(
-            account.pos_point > 50,
-            "Account must have positive point higher than {}",
-            50
-        );
-
-        if account.neg_point != 0 {
-            let rate = account.pos_point / account.neg_point;
-            assert!(
-                rate > self.app_config.critical_point as u32,
-                "Account must have positive point / negative point higher than {}",
-                self.app_config.critical_point
-            );
-        }
-
-        assert!(
-            amount >= self.app_config.minimum_deposit && amount <= self.app_config.maximum_deposit,
-            "Amount for each withdraws must be in a range from {} to {}",
-            self.app_config.minimum_deposit,
-            self.app_config.maximum_deposit
-        );
-
-        Promise::new(account_id.to_string())
-            .transfer(amount)
-            .then(ext_self::on_transferd(
-                account_id,
-                amount,
-                &env::current_account_id(),
-                0,
-                DEFAULT_GAS_TO_PAY,
-            ));
-    }
+    // #[payable]
+    // pub fn deposit(&mut self, account_id: Option<AccountId>) {
+    //     let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+    //     let mut account = self.internal_get_account(&account_id);
+    //
+    //     assert!(
+    //         env::attached_deposit() >= self.app_config.minimum_deposit
+    //             && env::attached_deposit() <= self.app_config.maximum_deposit,
+    //         "Total amount for each task must be in a range from {} to {}",
+    //         self.app_config.minimum_deposit,
+    //         self.app_config.maximum_deposit
+    //     );
+    //
+    //     account.balance += env::attached_deposit();
+    //     self.internal_set_account(&account_id, account)
+    // }
+    //
+    // pub fn withdraw(&mut self, account_id: Option<AccountId>, amount: Balance) {
+    //     let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+    //     let account = self.internal_get_account(&account_id);
+    //
+    //     assert!(
+    //         account.balance >= amount,
+    //         "Account doesn't have enough balance"
+    //     );
+    //
+    //     assert!(
+    //         account.pos_point > 50,
+    //         "Account must have positive point higher than {}",
+    //         50
+    //     );
+    //
+    //     if account.neg_point != 0 {
+    //         let rate = account.pos_point / account.neg_point;
+    //         assert!(
+    //             rate > self.app_config.critical_point as u32,
+    //             "Account must have positive point / negative point higher than {}",
+    //             self.app_config.critical_point
+    //         );
+    //     }
+    //
+    //     assert!(
+    //         amount >= self.app_config.minimum_deposit && amount <= self.app_config.maximum_deposit,
+    //         "Amount for each withdraws must be in a range from {} to {}",
+    //         self.app_config.minimum_deposit,
+    //         self.app_config.maximum_deposit
+    //     );
+    //
+    //     Promise::new(account_id.to_string())
+    //         .transfer(amount)
+    //         .then(ext_self::on_transferd(
+    //             account_id,
+    //             amount,
+    //             &env::current_account_id(),
+    //             0,
+    //             DEFAULT_GAS_TO_PAY,
+    //         ));
+    // }
 
     pub(crate) fn internal_create_account(&mut self, account_id: &AccountId) -> Account {
         let account = Account {
@@ -118,7 +118,7 @@ impl Dwork {
             bio: "A member of dWork".to_string(),
             total_earn: 0,
             total_spent: 0,
-            balance: env::attached_deposit(),
+            // balance: env::attached_deposit(),
             locked_balance: UnorderedMap::new(StorageKey::UserLockedBalance {
                 account_id: account_id.clone(),
             }),

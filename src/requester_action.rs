@@ -2,7 +2,7 @@ use crate::*;
 
 #[near_bindgen]
 impl Dwork {
-    #[payable]
+    // #[payable]
     pub fn new_task(
         &mut self,
         title: String,
@@ -21,16 +21,20 @@ impl Dwork {
             .checked_mul(unwrap_balance)
             .expect("Cannot calculate total amount");
 
-        // TODO: Must allow user to use current balance
+        let mut category = self
+            .categories
+            .get(&category_id)
+            .expect("Category not found");
+        let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
+
         assert!(
-            env::attached_deposit() == amount_need_to_pay,
-            "Attach exactly {} yoctoNear",
-            amount_need_to_pay
+            self.task_recores.get(&task_id).is_none(),
+            "Can't post twice per block"
         );
 
         assert!(
-            env::attached_deposit() >= self.app_config.minimum_reward_per_task
-                && env::attached_deposit() <= self.app_config.maximum_reward_per_task,
+            amount_need_to_pay >= self.app_config.minimum_reward_per_task
+                && amount_need_to_pay <= self.app_config.maximum_reward_per_task,
             "Total amount for each task must be in a range from {} to {}",
             self.app_config.minimum_reward_per_task,
             self.app_config.maximum_reward_per_task
@@ -50,12 +54,8 @@ impl Dwork {
         // Validate storage deposit
         let storage_update = self.new_storage_update(owner_id.clone());
 
-        let task_id = env::predecessor_account_id() + "_" + &env::block_index().to_string();
-
-        assert!(
-            self.task_recores.get(&task_id).is_none(),
-            "Can't post twice per block"
-        );
+        // Using balance to create task
+        self.internal_payment(amount_need_to_pay);
 
         let unwrap_duration: Duration = duration.into();
 
@@ -73,18 +73,13 @@ impl Dwork {
         };
 
         //Update num_posts in category
-        if let Some(mut category) = self.categories.get(&category_id) {
-            category.num_posts += 1;
-            self.categories.insert(&category_id, &category);
-        } else {
-            panic!("Not found your category");
-        }
+        category.num_posts += 1;
+        self.categories.insert(&category_id, &category);
 
         // Add task to task recores
         self.task_recores.insert(&task_id, &task);
 
         // Update Owner Account
-        owner.balance += env::attached_deposit();
         owner.current_jobs.insert(&task_id);
         self.internal_set_account(&owner_id, owner);
 
@@ -183,10 +178,17 @@ impl Dwork {
         self.finalize_storage_update(storage_update);
     }
 
+    // Will refund remainder amount for owner
+    // Just task owner can call this function
     pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
         let task = self.internal_get_task(&task_id);
         let mut owner = self.internal_get_account(&task.owner);
 
+        assert_eq!(
+            task.owner,
+            env::predecessor_account_id(),
+            "Only owner can mark this task as complete"
+        );
         assert!(
             task.last_rejection_published_at.is_none()
                 || task.last_rejection_published_at.unwrap()
@@ -235,7 +237,7 @@ impl Dwork {
             .checked_mul(refund.into())
             .expect("Can not calculate amount to refund");
 
-        owner.balance += remainder;
+        self.internal_send(remainder);
         owner.completed_jobs.insert(&task_id);
         owner.current_jobs.remove(&task_id);
         owner.total_spent += task.price * task.max_participants as u128 - remainder;

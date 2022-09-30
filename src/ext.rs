@@ -1,12 +1,12 @@
-use super::*;
+// use super::*;
 
-#[ext_contract(ext_self)]
-pub trait ExtDupwork {
-    fn on_transferd(&mut self, account_id: AccountId, amount: Balance) -> bool;
-}
-//
-#[near_bindgen]
-impl Dwork {
+// #[ext_contract(ext_self)]
+// pub trait ExtDupwork {
+//     fn on_transferd(&mut self, account_id: AccountId, amount: Balance) -> bool;
+// }
+// //
+// #[near_bindgen]
+// impl Dwork {
     // Ext
     // pub fn on_refund(
     //     &mut self,
@@ -107,25 +107,25 @@ impl Dwork {
     //         _ => false,
     //     }
     // }
-    pub fn on_transferd(&mut self, account_id: AccountId, amount: Balance) -> bool {
-        assert!(
-            env::predecessor_account_id() == env::current_account_id(),
-            "Callback is not called from the contract itself",
-        );
-
-        assert!(
-            env::promise_results_count() == 1,
-            "Function called not as a callback",
-        );
-
-        match env::promise_result(0) {
-            PromiseResult::Successful(_) => {
-                let mut account = self.internal_get_account(&account_id);
-                account.balance -= amount;
-                self.internal_set_account(&account_id, account);
-                true
-            }
-            _ => false,
-        }
-    }
-}
+    // pub fn on_transferd(&mut self, account_id: AccountId, amount: Balance) -> bool {
+    //     assert!(
+    //         env::predecessor_account_id() == env::current_account_id(),
+    //         "Callback is not called from the contract itself",
+    //     );
+    //
+    //     assert!(
+    //         env::promise_results_count() == 1,
+    //         "Function called not as a callback",
+    //     );
+    //
+    //     match env::promise_result(0) {
+    //         PromiseResult::Successful(_) => {
+    //             let mut account = self.internal_get_account(&account_id);
+    //             account.balance -= amount;
+    //             self.internal_set_account(&account_id, account);
+    //             true
+    //         }
+    //         _ => false,
+    //     }
+    // }
+// }

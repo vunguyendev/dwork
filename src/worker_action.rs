@@ -95,15 +95,12 @@ impl Dwork {
     pub fn claim(&mut self, task_id: TaskId) {
         // let mut task = self.internal_get_task(&task_id);
         let worker_id = env::predecessor_account_id();
-        let mut worker = self.internal_get_account(&worker_id);
+        let worker = self.internal_get_account(&worker_id);
         let LockedBalance { amount, release_at } = worker.locked_balance.get(&task_id).expect("Locked Balance not found");
         
         assert!(release_at < env::block_timestamp(), "This balance still be locked");
 
-        worker.balance += amount;
+        self.internal_send(amount);
         self.internal_set_account(&worker_id, worker);
-
-        // task.budget -= amount;
-        // self.task_recores.insert(&task_id, &task);
     }
 }
