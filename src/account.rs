@@ -1,9 +1,10 @@
 use crate::*;
+use near_sdk::json_types::U128;
+use std::convert::TryInto;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct LockedBalance {
-    // pub task_id: TaskId,
     pub amount: Balance,
     pub release_at: Timestamp,
 }
@@ -15,7 +16,6 @@ pub struct Account {
 
     pub total_spent: Balance,
     pub total_earn: Balance,
-    // pub balance: Balance,
 
     pub locked_balance: UnorderedMap<TaskId, LockedBalance>,
 
@@ -26,23 +26,65 @@ pub struct Account {
     pub neg_point: u32,
 }
 
+impl Account {
+    pub fn add_pos_point(&mut self, point: u32) {
+        self.pos_point += point
+    }
+    
+    pub fn add_neg_point(&mut self, point: u32) {
+        self.neg_point += point
+    }
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct WrappedAccount {
+    pub account_id: String,
+    pub bio: String,
+    pub locked_balance: Vec<(TaskId, LockedBalance)>,
+    pub balance: Option<AccountStorageBalance>,
+
+    pub total_spent: U128,
+    pub total_earn: U128,
+
+    pub current_jobs: Vec<TaskId>,
+    pub completed_jobs: Vec<TaskId>,
+
+    pub pos_point: u32,
+    pub neg_point: u32,
+}
+
+impl From<Account> for WrappedAccount {
+    fn from(account: Account) -> Self {
+        Self {
+            account_id: account.account_id,
+            bio: account.bio,
+            locked_balance: account.locked_balance.iter().map(|(k, v)| (k, v)).collect(),
+            balance: None,
+
+            total_spent: account.total_spent.into(),
+            total_earn: account.total_earn.into(),
+
+            current_jobs: account.current_jobs.to_vec(),
+            completed_jobs: account.completed_jobs.to_vec(),
+
+            pos_point: account.pos_point,
+            neg_point: account.neg_point,
+        }
+    }
+}
+
 #[near_bindgen]
 impl Dwork {
-    pub fn user_info(&self, account_id: AccountId) -> Value {
-        self.accounts
+    pub fn user_info(&self, account_id: AccountId) -> WrappedAccount {
+        let mut wrapped_account: WrappedAccount = self
+            .accounts
             .get(&account_id)
-            .map(|v| {
-                json!({
-                    "account_id": v.account_id,
-                    "bio": v.bio,
-                    "completed_jobs": v.completed_jobs.to_vec(),
-                    "current_jobs": v.current_jobs.to_vec(),
-                    "total_earn": v.total_earn,
-                    "total_spent": v.total_spent,
-                    // "balance": v.balance
-                })
-            })
-            .expect("Canot map user to json")
+            .expect("Account not found")
+            .into();
+        let storage_balance = self.storage_balance_of((account_id.as_str()).try_into().unwrap());
+        wrapped_account.balance = Some(storage_balance);
+        wrapped_account
     }
 
     // Modify method
@@ -152,19 +194,5 @@ impl Dwork {
 
     pub(crate) fn internal_set_account(&mut self, account_id: &AccountId, account: Account) {
         self.accounts.insert(account_id, &account);
-    }
-
-    pub(crate) fn add_pos_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.pos_point;
-        account.pos_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
-    }
-
-    pub(crate) fn add_neg_point(&mut self, account_id: AccountId, point: u32) {
-        let mut account = self.internal_get_account(&account_id);
-        let cur_point = account.neg_point;
-        account.neg_point = cur_point + point;
-        self.internal_set_account(&account_id, account);
     }
 }

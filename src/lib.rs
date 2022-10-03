@@ -2,7 +2,6 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{WrappedBalance, WrappedDuration, WrappedTimestamp};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::serde_json::{json, Value};
 use near_sdk::{
     env, near_bindgen, setup_alloc, AccountId, Balance, BorshStorageKey, Duration, Gas,
     PanicOnDefault, Promise, StorageUsage, Timestamp

@@ -12,14 +12,18 @@ impl Dwork {
         duration: WrappedDuration,
         category_id: CategoryId,
     ) {
-        //TODO: Maximum deposit
         let owner_id = env::predecessor_account_id();
         let mut owner = self.internal_get_account(&owner_id);
 
+        // Validate storage deposit
+        let storage_update = self.new_storage_update(owner_id.clone());
+
         let unwrap_balance: Balance = price.into();
-        let amount_need_to_pay: Balance = (max_participants as u128)
+        let mut amount_need_to_pay: Balance = (max_participants as u128)
             .checked_mul(unwrap_balance)
             .expect("Cannot calculate total amount");
+        // Get 10% for other service
+        amount_need_to_pay = amount_need_to_pay + amount_need_to_pay / 10;
 
         let mut category = self
             .categories
@@ -51,9 +55,6 @@ impl Dwork {
             self.app_config.maximum_proposals_at_one_time
         );
 
-        // Validate storage deposit
-        let storage_update = self.new_storage_update(owner_id.clone());
-
         // Using balance to create task
         self.internal_payment(amount_need_to_pay);
 
@@ -65,6 +66,7 @@ impl Dwork {
             description,
             price: price.into(),
             max_participants,
+            buget: amount_need_to_pay,
             proposals: Vec::new(),
             created_at: env::block_timestamp(),
             submit_available_until: env::block_timestamp() + unwrap_duration,
@@ -116,7 +118,7 @@ impl Dwork {
             self.internal_get_proposal(task_id.clone(), worker_id.clone());
 
         assert!(
-            proposal.status != ProposalStatus::Pending,
+            proposal.status == ProposalStatus::Pending,
             "You already approved or rejected this worker!!"
         );
 
@@ -138,6 +140,7 @@ impl Dwork {
             // Must be the last rejection deadline report + 3 days
         };
         worker.locked_balance.insert(&task_id, &new_locked_balance);
+        worker.add_pos_point(self.app_config.sml_plus as u32);
         self.internal_set_account(&worker_id, worker);
 
         self.finalize_storage_update(storage_update);
@@ -159,7 +162,7 @@ impl Dwork {
         let (proposal_id, mut proposal) = self.internal_get_proposal(task_id.clone(), worker_id);
 
         assert!(
-            proposal.status != ProposalStatus::Pending,
+            proposal.status == ProposalStatus::Pending,
             "You already approved or rejected this worker!!"
         );
 
@@ -181,6 +184,8 @@ impl Dwork {
     // Will refund remainder amount for owner
     // Just task owner can call this function
     pub fn mark_task_as_completed(&mut self, task_id: TaskId) {
+        let storage_update = self.new_storage_update(env::predecessor_account_id());
+
         let task = self.internal_get_task(&task_id);
         let mut owner = self.internal_get_account(&task.owner);
 
@@ -220,27 +225,65 @@ impl Dwork {
             "Task still in progress"
         );
 
-        let refund: u64 = (task.max_participants as u64)
-            - task
-                .proposals
-                .iter()
-                .filter(|proposal_id| {
+        let reports_by = task
+            .proposals
+            .iter()
+            .filter_map(|proposal_id| {
+                (matches!(
                     self.proposals
                         .get(proposal_id)
                         .expect("Proposal not found")
+                        .status,
+                    ProposalStatus::ApprovedByAdmin { account_id: _ }
+                        | ProposalStatus::RejectedByAdmin { account_id: _ }
+                ))
+                .then(|| {
+                    match self
+                        .proposals
+                        .get(proposal_id)
+                        .expect("Proposal not found")
                         .status
-                        == ProposalStatus::Approved
+                    {
+                        ProposalStatus::ApprovedByAdmin { account_id } => account_id,
+                        ProposalStatus::RejectedByAdmin { account_id } => account_id,
+                        _ => "".to_string(),
+                    }
                 })
-                .count() as u64;
+            })
+            .collect::<Vec<String>>();
 
-        let remainder = (task.price as u128)
-            .checked_mul(refund.into())
-            .expect("Can not calculate amount to refund");
+        let refund: u64 = task
+            .proposals
+            .iter()
+            .filter(|proposal_id| {
+                self.proposals
+                    .get(proposal_id)
+                    .expect("Proposal not found")
+                    .status
+                    == ProposalStatus::Approved
+            })
+            .count() as u64;
 
-        self.internal_send(remainder);
+        let mut remainder = task.buget
+            - (task.price)
+                .checked_mul(refund.into())
+                .expect("Can not calculate amount to refund");
+
+        if !reports_by.is_empty() {
+            let amount = remainder / (reports_by.len() as u128);
+            reports_by
+                .iter()
+                .for_each(|account_id| self.internal_send(Some(account_id.to_string()), amount));
+            remainder = 0;
+        }
+
         owner.completed_jobs.insert(&task_id);
         owner.current_jobs.remove(&task_id);
-        owner.total_spent += task.price * task.max_participants as u128 - remainder;
+        owner.total_spent += task.buget - remainder;
+        owner.add_pos_point(self.app_config.sml_plus as u32);
         self.internal_set_account(&task.owner, owner);
+        self.internal_send(None, remainder);
+
+        self.finalize_storage_update(storage_update);
     }
 }

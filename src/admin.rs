@@ -1,5 +1,4 @@
 use core::fmt;
-
 use crate::*;
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
@@ -38,6 +37,14 @@ pub struct AppConfig {
     pub minimum_deposit: Balance,
     pub maximum_deposit: Balance,
 
+    pub big_plus: u16,
+    pub med_plus: u16,
+    pub sml_plus: u16,
+
+    pub big_minus: u16,
+    pub med_minus: u16,
+    pub sml_minus: u16,
+    
     pub claim_point_bonus: u32, // may be a near bonus was given by requester to pay for who call
                                 // first claim / complete task
     pub critical_point: u16,
@@ -63,7 +70,15 @@ impl Default for AppConfig {
             maximum_deposit: 500_000_000_000_000_000_000_000_000, // 500 N
 
             claim_point_bonus: 10,
-            critical_point: 85
+            critical_point: 85,
+            
+            big_plus: 15,
+            med_plus: 10,
+            sml_plus: 5,
+
+            big_minus: 20,
+            med_minus: 15,
+            sml_minus: 10,
         }
     }
 }
@@ -155,6 +170,7 @@ impl Dwork {
 
     pub fn approve_report(&mut self, report_id: ReportId) {
         let mut report = self.reports.get(&report_id).expect("Report not found");
+        assert!(self.is_admin(env::predecessor_account_id()), "For now, just admin can approve report");
         assert!(
             report.status == ReportStatus::Pending,
             "Can't approved this report"
@@ -180,7 +196,7 @@ impl Dwork {
         self.reports.insert(&report_id, &report);
 
         // Update Proposal Status
-        proposal.status = ProposalStatus::Approved;
+        proposal.status = ProposalStatus::ApprovedByAdmin{account_id: env::predecessor_account_id()};
         self.proposals.insert(&proposal_id, &proposal);
 
         /* Update Worker Locked balance
@@ -189,6 +205,7 @@ impl Dwork {
          */
         // Add locked balance for woker
         let mut worker = self.internal_get_account(&report.account_id);
+        let mut owner = self.internal_get_account(&task.owner);
         let release_at: Timestamp = match task.last_rejection_published_at {
             Some(time) => {
                 time + self.app_config.report_interval + self.app_config.validate_report_interval
@@ -200,8 +217,14 @@ impl Dwork {
             release_at,
             // Must be the last rejection deadline report + 3 days
         };
+        
+        worker.add_pos_point(self.app_config.sml_plus as u32);
         worker.locked_balance.insert(&report.task_id, &new_locked_balance);
         self.internal_set_account(&report.account_id, worker);
+
+        // BIG minus for wrong rejection
+        owner.add_neg_point(self.app_config.big_minus as u32);
+        self.internal_set_account(&task.owner, owner);
         
         let mut num_approvals = 0;
         for proposal_id in task.proposals.iter() {
@@ -233,11 +256,13 @@ impl Dwork {
 
     pub fn reject_report(&mut self, report_id: ReportId) {
         let mut report = self.reports.get(&report_id).expect("Report not found");
+        assert!(self.is_admin(env::predecessor_account_id()), "For now, just admin can reject report");
         assert!(
             report.status == ReportStatus::Pending,
             "Cann't reject this report"
         );
 
+        let mut worker = self.internal_get_account(&report.account_id);
         let (proposal_id, mut proposal) =
             self.internal_get_proposal(report.task_id.clone(), report.account_id.clone());
         
@@ -252,10 +277,13 @@ impl Dwork {
             _ => panic!("Invalid report"),
         }
 
+        worker.add_neg_point(self.app_config.med_minus as u32);
+        self.internal_set_account(&report.account_id, worker);
+
         report.status = ReportStatus::Rejected;
         self.reports.insert(&report_id, &report);
 
-        proposal.status = ProposalStatus::RejectedByAdmin;
+        proposal.status = ProposalStatus::RejectedByAdmin {account_id: env::predecessor_account_id()};
         self.proposals.insert(&proposal_id, &proposal);
     }
 }

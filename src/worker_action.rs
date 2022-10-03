@@ -12,9 +12,13 @@ impl Dwork {
         );
 
         let mut task = self.internal_get_task(&task_id);
+        let worker_id = env::predecessor_account_id();
         let now = env::block_timestamp();
+        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
 
         assert!(task.submit_available_until > now, "Request is expired");
+
+        assert!(self.proposals.get(&proposal_id).is_none(), "Already submitted this task");
 
         assert!(
             task.proposals
@@ -29,12 +33,10 @@ impl Dwork {
         );
 
         // Increase worker current task
-        let worker_id = env::predecessor_account_id();
         let mut worker = self.internal_get_account(&worker_id);
         worker.current_jobs.insert(&task_id);
         self.internal_set_account(&worker_id, worker);
 
-        let proposal_id = self.internal_gen_proposal_id(task_id.clone(), worker_id.clone());
         let proposal = Proposal {
             account_id: worker_id,
             submit_time: now,
@@ -95,12 +97,14 @@ impl Dwork {
     pub fn claim(&mut self, task_id: TaskId) {
         // let mut task = self.internal_get_task(&task_id);
         let worker_id = env::predecessor_account_id();
-        let worker = self.internal_get_account(&worker_id);
+        let mut worker = self.internal_get_account(&worker_id);
         let LockedBalance { amount, release_at } = worker.locked_balance.get(&task_id).expect("Locked Balance not found");
         
         assert!(release_at < env::block_timestamp(), "This balance still be locked");
 
-        self.internal_send(amount);
+        worker.add_pos_point(self.app_config.sml_plus as u32);
+        worker.locked_balance.remove(&task_id);
+        self.internal_send(None, amount);
         self.internal_set_account(&worker_id, worker);
     }
 }

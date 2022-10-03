@@ -12,7 +12,8 @@ pub enum ProposalStatus {
         reject_at: Timestamp,
         report_id: Option<ReportId>,
     },
-    RejectedByAdmin
+    ApprovedByAdmin {account_id: AccountId},
+    RejectedByAdmin {account_id: AccountId}
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Serialize, Deserialize)]

@@ -77,6 +77,11 @@ wait
 
 if [ $action_index -eq 2 ]
 then
+  directory=lastest_neardev
+  if test -d "$directory"; then
+    echo "Removing last version"
+    rm -rf ./lastest_neardev
+  fi
   mv ./neardev ./lastest_neardev
 fi
 
