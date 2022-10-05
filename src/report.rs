@@ -23,8 +23,8 @@ pub struct Report {
 #[near_bindgen]
 impl Dwork {
     pub fn get_reports(&self, from_index: u64, limit: u64) -> Vec<Report> {
-        let caller = env::predecessor_account_id();
-        assert!(self.is_admin(caller), "Just admin can call this function");
+        // let caller = env::predecessor_account_id();
+        // assert!(self.is_admin(caller), "Just admin can call this function");
         let reports = self.reports.keys_as_vector();
         
         calculate_rev_limit(reports.len(), from_index, limit)
@@ -34,5 +34,9 @@ impl Dwork {
             })
             .rev()
             .collect()
+    }
+
+    pub fn get_report_by_id(&self, report_id: ReportId) -> Report {
+        self.reports.get(&report_id).expect("Report not found")
     }
 }

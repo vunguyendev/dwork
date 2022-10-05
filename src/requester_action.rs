@@ -1,8 +1,9 @@
 use crate::*;
+// use near_sdk::ONE_NEAR;
 
 #[near_bindgen]
 impl Dwork {
-    // #[payable]
+    #[payable]
     pub fn new_task(
         &mut self,
         title: String,
@@ -56,7 +57,12 @@ impl Dwork {
         );
 
         // Using balance to create task
-        self.internal_payment(amount_need_to_pay);
+        // self.internal_payment(amount_need_to_pay);
+        assert!(
+            env::attached_deposit() == amount_need_to_pay,
+            "You must attach exactly {} yocto near to create task",
+            amount_need_to_pay / 1_000_000_000_000_000_000_000_000
+        );
 
         let unwrap_duration: Duration = duration.into();
 
@@ -159,7 +165,8 @@ impl Dwork {
         );
 
         // Check proposal condition
-        let (proposal_id, mut proposal) = self.internal_get_proposal(task_id.clone(), worker_id);
+        let (proposal_id, mut proposal) =
+            self.internal_get_proposal(task_id.clone(), worker_id);
 
         assert!(
             proposal.status == ProposalStatus::Pending,
@@ -194,36 +201,43 @@ impl Dwork {
             env::predecessor_account_id(),
             "Only owner can mark this task as complete"
         );
-        assert!(
-            task.last_rejection_published_at.is_none()
-                || task.last_rejection_published_at.unwrap()
-                    + self.app_config.report_interval
-                    + self.app_config.validate_report_interval
-                    < env::block_timestamp(),
-            "Task still in progress"
-        );
-        assert!(
-            task.proposals
-                .iter()
-                .filter(|proposal_id| {
-                    match self
-                        .proposals
-                        .get(proposal_id)
-                        .expect("Proposal not found")
-                        .status
-                    {
-                        ProposalStatus::Rejected {
-                            reason: _,
-                            reject_at: _,
-                            report_id,
-                        } => report_id.is_some(),
-                        _ => false,
-                    }
-                })
-                .count()
-                == 0,
-            "Task still in progress"
-        );
+
+        if task.proposals.is_empty() {
+            assert!(
+                task.submit_available_until > env::block_timestamp(),
+                "Wait until end submit interval"
+            )
+        } else {
+            assert!(
+                task.proposals
+                    .iter()
+                    .filter(|proposal_id| {
+                        match self
+                            .proposals
+                            .get(proposal_id)
+                            .expect("Proposal not found")
+                            .status
+                        {
+                            ProposalStatus::Rejected {
+                                reason: _,
+                                reject_at: _,
+                                report_id,
+                            } => report_id.is_some(),
+                            _ => false,
+                        }
+                    })
+                    .count()
+                    == 0,
+                "Validating reports!"
+            );
+
+            assert!(
+                task.last_rejection_published_at.is_none()
+                    || task.last_rejection_published_at.unwrap() + self.app_config.report_interval
+                        < env::block_timestamp(),
+                "Now is in report interval."
+            );
+        }
 
         let reports_by = task
             .proposals

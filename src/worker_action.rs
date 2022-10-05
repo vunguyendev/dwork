@@ -65,7 +65,7 @@ impl Dwork {
                 assert!(reason != "late", "Cannot report this reject reason");
                 assert!(report_id.is_none(), "Reported this rejection");
                 assert!(
-                    reject_at + self.app_config.report_interval < env::block_timestamp(),
+                    reject_at + self.app_config.report_interval > env::block_timestamp(),
                     "Not available to report this rejection"
                 );
 

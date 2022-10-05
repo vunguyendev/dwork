@@ -169,17 +169,17 @@ impl Dwork {
         self.storage_accounts.insert(&account_id, &storage_account);
     }
 
-    pub(crate) fn internal_payment(&mut self, amount: Balance) {
-        let account_id = env::predecessor_account_id();
-        let storage_balance = self.storage_balance_of((account_id.as_str()).try_into().unwrap());
-        assert!(
-            amount <= storage_balance.available.0,
-            "Balance not available to pay for internal request",
-        );
-        let mut storage_account = self.storage_accounts.get(&account_id).unwrap();
-        storage_account.balance -= amount;
-        self.storage_accounts.insert(&account_id, &storage_account);
-    }
+    // pub(crate) fn internal_payment(&mut self, amount: Balance) {
+    //     let account_id = env::predecessor_account_id();
+    //     let storage_balance = self.storage_balance_of((account_id.as_str()).try_into().unwrap());
+    //     assert!(
+    //         amount <= storage_balance.available.0,
+    //         "Balance not available to pay for internal request",
+    //     );
+    //     let mut storage_account = self.storage_accounts.get(&account_id).unwrap();
+    //     storage_account.balance -= amount;
+    //     self.storage_accounts.insert(&account_id, &storage_account);
+    // }
 
     pub(crate) fn internal_send(&mut self, account_id: Option<AccountId>, amount: Balance) {
         let account_id = account_id.unwrap_or_else(env::predecessor_account_id);

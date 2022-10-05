@@ -169,7 +169,7 @@ impl Dwork {
     }
 
     pub fn approve_report(&mut self, report_id: ReportId) {
-        let mut report = self.reports.get(&report_id).expect("Report not found");
+        let report = self.reports.get(&report_id).expect("Report not found");
         assert!(self.is_admin(env::predecessor_account_id()), "For now, just admin can approve report");
         assert!(
             report.status == ReportStatus::Pending,
@@ -186,14 +186,15 @@ impl Dwork {
                 reject_at: _,
                 report_id,
             } => {
-                assert!(report_id.is_none(), "Invalid report");
+                assert!(report_id.is_some(), "Invalid report");
             }
             _ => panic!("Invalid report"),
         }
 
         // Update Report status
-        report.status = ReportStatus::Approved;
-        self.reports.insert(&report_id, &report);
+        // report.status = ReportStatus::Approved;
+        // self.reports.insert(&report_id, &report);
+        self.reports.remove(&report_id);
 
         // Update Proposal Status
         proposal.status = ProposalStatus::ApprovedByAdmin{account_id: env::predecessor_account_id()};
@@ -255,7 +256,7 @@ impl Dwork {
     }
 
     pub fn reject_report(&mut self, report_id: ReportId) {
-        let mut report = self.reports.get(&report_id).expect("Report not found");
+        let report = self.reports.get(&report_id).expect("Report not found");
         assert!(self.is_admin(env::predecessor_account_id()), "For now, just admin can reject report");
         assert!(
             report.status == ReportStatus::Pending,
@@ -272,7 +273,7 @@ impl Dwork {
                 reject_at: _,
                 report_id,
             } => {
-                assert!(report_id.is_none(), "Invalid report");
+                assert!(report_id.is_some(), "Invalid report");
             }
             _ => panic!("Invalid report"),
         }
@@ -280,8 +281,9 @@ impl Dwork {
         worker.add_neg_point(self.app_config.med_minus as u32);
         self.internal_set_account(&report.account_id, worker);
 
-        report.status = ReportStatus::Rejected;
-        self.reports.insert(&report_id, &report);
+        // report.status = ReportStatus::Rejected;
+        // self.reports.insert(&report_id, &report);
+        self.reports.remove(&report_id);
 
         proposal.status = ProposalStatus::RejectedByAdmin {account_id: env::predecessor_account_id()};
         self.proposals.insert(&proposal_id, &proposal);
