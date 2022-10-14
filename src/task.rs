@@ -51,7 +51,6 @@ impl Dwork {
         let proposals: Vec<Proposal> = proposals
             .iter()
             .map(|item| self.proposals.get(item).expect("Proposal not found"))
-            .rev()
             .collect();
 
         WrappedTask {

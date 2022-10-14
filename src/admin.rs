@@ -118,7 +118,7 @@ impl Dwork {
         let caller_id = env::predecessor_account_id();
         let contract_id = env::current_account_id();
         assert!(
-            caller_id == "neilharan.testnet" || caller_id == contract_id,
+            caller_id == contract_id,
             "You not have permission to give admin rights"
         );
         assert!(
@@ -132,7 +132,7 @@ impl Dwork {
         let caller_id = env::predecessor_account_id();
         let contract_id = env::current_account_id();
         assert!(
-            caller_id == "neilharan.testnet" || caller_id == contract_id,
+            caller_id == contract_id,
             "You not have permission to remove admin rights"
         );
         assert!(
